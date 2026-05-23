@@ -4,7 +4,7 @@ import {
   Layers, Grid3X3, Sliders, Users, Calendar, UserCheck, MessageSquare,
   Award, ShieldCheck, Sun, Moon, Menu, X, Terminal, LogOut, Loader2
 } from "lucide-react";
-import { auth, signInWithGoogle, firebaseSignOut, getAuthToken } from "@/src/lib/firebase";
+import { auth, signInWithGoogle, checkRedirectResult, firebaseSignOut, getAuthToken } from "@/src/lib/firebase";
 import Home from "@/src/components/pages/Home";
 import Projects from "@/src/components/pages/Projects";
 import Services from "@/src/components/pages/Services";
@@ -94,12 +94,36 @@ function AppInner() {
         };
         setUser(loggedUser);
         localStorage.setItem("panadev_user", JSON.stringify(loggedUser));
+        setIsSignInModalOpen(false);
       } else {
         setIdToken(null);
         // Don't wipe user — allow guest browsing from localStorage
       }
     });
     return () => unsubscribe();
+  }, []);
+
+  // Check for redirect result after Google sign-in
+  useEffect(() => {
+    checkRedirectResult()
+      .then((result) => {
+        if (result) {
+          const { user: firebaseUser, token } = result;
+          setIdToken(token);
+          const loggedUser = {
+            name: firebaseUser.displayName || firebaseUser.email || "User",
+            email: firebaseUser.email || "",
+            avatarUrl: firebaseUser.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${(firebaseUser.displayName || "U")[0]}&backgroundColor=059669`
+          };
+          setUser(loggedUser);
+          localStorage.setItem("panadev_user", JSON.stringify(loggedUser));
+          setIsSignInModalOpen(false);
+          showToast(`Welcome, ${loggedUser.name}! ✓`);
+        }
+      })
+      .catch((err) => {
+        console.error("Redirect result error:", err);
+      });
   }, []);
 
   // Load theme
@@ -157,21 +181,11 @@ function AppInner() {
   const handleGoogleLogin = async () => {
     try {
       setAuthLoading(true);
-      const { user: firebaseUser, token } = await signInWithGoogle();
-      setIdToken(token);
-      const loggedUser = {
-        name: firebaseUser.displayName || firebaseUser.email || "User",
-        email: firebaseUser.email || "",
-        avatarUrl: firebaseUser.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${(firebaseUser.displayName || "U")[0]}&backgroundColor=059669`
-      };
-      setUser(loggedUser);
-      localStorage.setItem("panadev_user", JSON.stringify(loggedUser));
-      setIsSignInModalOpen(false);
-      showToast(`Welcome, ${loggedUser.name}! ✓`);
+      // signInWithGoogle now redirects — the result is handled by checkRedirectResult on next load
+      await signInWithGoogle();
     } catch (err: any) {
       console.error(err);
       showToast(err?.message || "Sign-in failed. Please try again.", "error");
-    } finally {
       setAuthLoading(false);
     }
   };
