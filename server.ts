@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createRequire } from "module";
+
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { Resend } from "resend";
@@ -11,8 +11,7 @@ import cors from "cors";
 
 dotenv.config();
 
-const require = createRequire(import.meta.url);
-const admin = require("firebase-admin");
+import admin from "firebase-admin";
 
 type Firestore = ReturnType<typeof admin.firestore>;
 let dbFirestore: Firestore | null = null;
