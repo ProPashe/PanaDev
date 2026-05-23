@@ -19,16 +19,27 @@ type Firestore = ReturnType<typeof admin.firestore>;
 let dbFirestore: Firestore | null = null;
 
 try {
-  const serviceAccountPath = path.join(process.cwd(), "serviceAccountKey.json");
-  if (fs.existsSync(serviceAccountPath)) {
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+  let serviceAccount;
+  
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // For Vercel deployment: Read from Environment Variable
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else {
+    // For Local development: Read from file
+    const serviceAccountPath = path.join(process.cwd(), "serviceAccountKey.json");
+    if (fs.existsSync(serviceAccountPath)) {
+      serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+    }
+  }
+
+  if (serviceAccount) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
     dbFirestore = admin.firestore();
-    console.log("✅ Firebase Admin SDK initialized. Connected to Firestore: panadev-3069");
+    console.log("✅ Firebase Admin SDK initialized. Connected to Firestore.");
   } else {
-    console.warn("⚠️  No serviceAccountKey.json found. Firebase features disabled.");
+    console.warn("⚠️  No FIREBASE_SERVICE_ACCOUNT env var or serviceAccountKey.json found. Firebase features disabled.");
   }
 } catch (error) {
   console.error("❌ Error initializing Firebase Admin SDK:", error);
@@ -571,4 +582,10 @@ async function startServer() {
   });
 }
 
-startServer();
+// Export the Express API for Vercel Serverless
+export default app;
+
+// Only start the server if not running in a serverless environment (Vercel)
+if (!process.env.VERCEL) {
+  startServer();
+}
