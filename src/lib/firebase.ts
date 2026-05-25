@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
 
 // Your Firebase Web App config
 const firebaseConfig = {
@@ -16,9 +16,23 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-/** Initiate Google sign-in redirect — result is captured in checkRedirectResult */
+/** Initiate Google sign-in popup with redirect fallback */
 async function signInWithGoogle() {
-  await signInWithRedirect(auth, googleProvider);
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (error: any) {
+    const code = error?.code || "";
+    const popupFallbackCodes = [
+      "auth/popup-blocked",
+      "auth/cancelled-popup-request",
+      "auth/popup-closed-by-user",
+      "auth/web-storage-unsupported",
+    ];
+    if (popupFallbackCodes.includes(code)) {
+      return signInWithRedirect(auth, googleProvider);
+    }
+    throw error;
+  }
 }
 
 /** Call on app load to capture the result after a Google redirect sign-in */

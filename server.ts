@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -10,6 +11,16 @@ import helmet from "helmet";
 import cors from "cors";
 
 dotenv.config();
+
+// ⚠️ FAIL FAST: Ensure critical env vars are set in production
+if (process.env.NODE_ENV === "production") {
+  const required = ["JWT_SECRET", "ADMIN_PASSWORD"];
+  const missing = required.filter(v => !process.env[v]);
+  if (missing.length) {
+    console.error(`FATAL: Missing required env vars: ${missing.join(", ")}`);
+    process.exit(1);
+  }
+}
 
 import admin from "firebase-admin";
 
@@ -35,12 +46,13 @@ try {
       credential: admin.credential.cert(serviceAccount)
     });
     dbFirestore = admin.firestore();
-    console.log("✅ Firebase Admin SDK initialized. Connected to Firestore.");
+    if (process.env.NODE_ENV !== "production") console.log("Firebase Admin initialized");
   } else {
-    console.warn("⚠️  No FIREBASE_SERVICE_ACCOUNT env var or serviceAccountKey.json found. Firebase features disabled.");
+    if (process.env.NODE_ENV !== "production") console.warn("Firebase not configured");
   }
 } catch (error) {
-  console.error("❌ Error initializing Firebase Admin SDK:", error);
+  console.error("Firebase init error");
+  if (process.env.NODE_ENV !== "production") console.error(error);
 }
 
 // ─── Email (Resend) ──────────────────────────────────────────────────────────
@@ -68,9 +80,19 @@ async function sendNotification(subject: string, html: string) {
 const app = express();
 const PORT = 3000;
 
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === "production" ? true : false,
+  hsts: { maxAge: 31536000, includeSubDomains: true }
+}));
+
+app.use(cors({
+  origin: process.env.NODE_ENV === "production" 
+    ? ["https://panadev.vercel.app", process.env.APP_URL].filter(Boolean)
+    : true,
+  credentials: true
+}));
+
+app.use(express.json({ limit: "1mb" }));
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 const formLimiter = rateLimit({
@@ -89,6 +111,33 @@ const aiLimiter = rateLimit({
   message: { error: "AI rate limit reached. Please wait before making more requests." }
 });
 
+// ─── Custom JWT Utilities ──────────────────────────────────────────────────────
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? "" : "dev-secret");
+if (!JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET required in production");
+}
+
+function signToken(payload: object): string {
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+  const payloadStr = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 })).toString("base64url");
+  const signature = crypto.createHmac("sha256", JWT_SECRET).update(`${header}.${payloadStr}`).digest("base64url");
+  return `${header}.${payloadStr}.${signature}`;
+}
+
+function verifyToken(token: string): any {
+  try {
+    const [headerB64, payloadB64, signature] = token.split(".");
+    if (!headerB64 || !payloadB64 || !signature) return null;
+    const expectedSignature = crypto.createHmac("sha256", JWT_SECRET).update(`${headerB64}.${payloadB64}`).digest("base64url");
+    if (signature !== expectedSignature) return null;
+    const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+    return payload;
+  } catch (err) {
+    return null;
+  }
+}
+
 // ─── Admin Auth Middleware ────────────────────────────────────────────────────
 const ADMIN_UID = process.env.ADMIN_UID || "";
 
@@ -98,6 +147,14 @@ async function verifyAdmin(req: any, res: any, next: any) {
     return res.status(401).json({ error: "Unauthorized: No token provided." });
   }
   const idToken = authHeader.split("Bearer ")[1];
+
+  // Try custom JWT token validation first
+  const customUser = verifyToken(idToken);
+  if (customUser) {
+    req.adminUser = customUser;
+    return next();
+  }
+
   try {
     const decoded = await admin.auth().verifyIdToken(idToken);
     // Allow if UID matches admin OR email matches admin email
@@ -129,6 +186,42 @@ async function fetchCollection(colName: string) {
   const snapshot = await dbFirestore.collection(colName).get();
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
+
+// ─── Public Admin Login & Health Endpoints ────────────────────────────────────
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+app.post("/api/admin-login", (req, res) => {
+  const { password } = req.body;
+  if (!password || typeof password !== "string" || password.length > 100) {
+    return res.status(400).json({ error: "Invalid request" });
+  }
+
+  const expectedPassword = process.env.ADMIN_PASSWORD;
+  if (!expectedPassword) {
+    return res.status(500).json({ error: "Server error" });
+  }
+  if (password !== expectedPassword) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const token = signToken({
+    uid: "admin-custom",
+    email: "mudzimwapanashe123@gmail.com",
+    name: "Panashe Mudzimwa (Admin)"
+  });
+
+  res.json({
+    success: true,
+    token,
+    user: {
+      name: "Panashe Mudzimwa (Admin)",
+      email: "mudzimwapanashe123@gmail.com",
+      avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=PM&backgroundColor=059669`
+    }
+  });
+});
 
 app.get("/api/data", verifyAdmin, async (req, res) => {
   if (!dbFirestore) return res.json({ bookings: [], feedbacks: [], sponsorships: [] });
