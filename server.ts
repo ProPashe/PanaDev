@@ -180,65 +180,6 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-// ─── Local Database Fallback Helpers ──────────────────────────────────────────
-async function writeToLocalDb(colName: string, item: any, id?: string) {
-  const dbPath = path.join(process.cwd(), "db.json");
-  if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify({}, null, 2), "utf8");
-  }
-  try {
-    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
-    if (!data[colName]) data[colName] = [];
-    if (id) {
-      const idx = data[colName].findIndex((x: any) => x.id === id);
-      if (idx !== -1) {
-        data[colName][idx] = { ...data[colName][idx], ...item, id };
-      } else {
-        data[colName].push({ ...item, id });
-      }
-    } else {
-      data[colName].push(item);
-    }
-    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
-  } catch (err) {
-    console.error(`Error writing to local db.json for ${colName}:`, err);
-    throw err;
-  }
-}
-
-async function deleteFromLocalDb(colName: string, id: string) {
-  const dbPath = path.join(process.cwd(), "db.json");
-  if (!fs.existsSync(dbPath)) return;
-  try {
-    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
-    if (data[colName]) {
-      data[colName] = data[colName].filter((x: any) => x.id !== id);
-      fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
-    }
-  } catch (err) {
-    console.error(`Error deleting from local db.json for ${colName}:`, err);
-    throw err;
-  }
-}
-
-async function updateLocalDbStatus(colName: string, id: string, status: string) {
-  const dbPath = path.join(process.cwd(), "db.json");
-  if (!fs.existsSync(dbPath)) return;
-  try {
-    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
-    if (data[colName]) {
-      const idx = data[colName].findIndex((x: any) => x.id === id);
-      if (idx !== -1) {
-        data[colName][idx].status = status;
-        fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
-      }
-    }
-  } catch (err) {
-    console.error(`Error updating local db.json for ${colName}:`, err);
-    throw err;
-  }
-}
-
 // Helper to fetch collection
 async function fetchCollection(colName: string) {
   if (!dbFirestore) {
@@ -256,42 +197,6 @@ async function fetchCollection(colName: string) {
   const snapshot = await dbFirestore.collection(colName).get();
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
-
-// ─── Public Admin Login & Health Endpoints ────────────────────────────────────
-app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-app.post("/api/admin-login", (req, res) => {
-  const { password } = req.body;
-  if (!password || typeof password !== "string" || password.length > 100) {
-    return res.status(400).json({ error: "Invalid request" });
-  }
-
-  const expectedPassword = process.env.ADMIN_PASSWORD;
-  if (!expectedPassword) {
-    return res.status(500).json({ error: "Server error" });
-  }
-  if (password !== expectedPassword) {
-    return res.status(401).json({ error: "Invalid credentials" });
-  }
-
-  const token = signToken({
-    uid: "admin-custom",
-    email: "mudzimwapanashe123@gmail.com",
-    name: "Panashe Mudzimwa (Admin)"
-  });
-
-  res.json({
-    success: true,
-    token,
-    user: {
-      name: "Panashe Mudzimwa (Admin)",
-      email: "mudzimwapanashe123@gmail.com",
-      avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=PM&backgroundColor=059669`
-    }
-  });
-});
 
 app.get("/api/data", verifyAdmin, async (req, res) => {
   const [bookings, feedbacks, sponsorships] = await Promise.all([
@@ -315,7 +220,6 @@ app.post("/api/projects", formLimiter, verifyAdmin, async (req, res) => {
   }
 
   const newProject = {
-    // If user provided a specific slug/ID, we use it, otherwise Firestore auto-generates
     title,
     description,
     fullDescription: fullDescription || "",
@@ -392,11 +296,6 @@ app.post("/api/bookings", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("bookings").add(newBooking);
     (newBooking as any).id = docRef.id;
-  } else {
-    const bookId = `b-${Date.now()}`;
-    const bookingWithId = { ...newBooking, id: bookId, status: "Pending" };
-    await writeToLocalDb("bookings", bookingWithId);
-    (newBooking as any).id = bookId;
   }
 
   sendNotification(
@@ -433,11 +332,6 @@ app.post("/api/feedback", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("feedbacks").add(newFeedback);
     (newFeedback as any).id = docRef.id;
-  } else {
-    const feedbackId = `fb-${Date.now()}`;
-    const feedbackWithId = { ...newFeedback, id: feedbackId };
-    await writeToLocalDb("feedbacks", feedbackWithId);
-    (newFeedback as any).id = feedbackId;
   }
 
   res.status(201).json({ success: true, feedback: newFeedback });
@@ -461,11 +355,6 @@ app.post("/api/feedbacks", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("feedbacks").add(newFeedback);
     (newFeedback as any).id = docRef.id;
-  } else {
-    const feedbackId = `fb-${Date.now()}`;
-    const feedbackWithId = { ...newFeedback, id: feedbackId };
-    await writeToLocalDb("feedbacks", feedbackWithId);
-    (newFeedback as any).id = feedbackId;
   }
 
   res.status(201).json({ success: true, feedback: newFeedback });
@@ -481,11 +370,6 @@ app.post("/api/contacts", formLimiter, async (req, res) => {
   if (dbFirestore) {
     await dbFirestore.collection("contacts").add({
       name, email, subject, message, createdAt: new Date().toISOString()
-    });
-  } else {
-    const contactId = `c-${Date.now()}`;
-    await writeToLocalDb("contacts", {
-      id: contactId, name, email, subject, message, createdAt: new Date().toISOString()
     });
   }
 
@@ -530,11 +414,6 @@ app.post("/api/sponsorships", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("sponsorships").add(newSponsor);
     (newSponsor as any).id = docRef.id;
-  } else {
-    const spId = `s-${Date.now()}`;
-    const sponsorWithId = { ...newSponsor, id: spId };
-    await writeToLocalDb("sponsorships", sponsorWithId);
-    (newSponsor as any).id = spId;
   }
 
   sendNotification(
