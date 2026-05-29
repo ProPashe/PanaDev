@@ -1,1 +1,19 @@
-FROM node:20-alpine\n\nWORKDIR /app\n\n# Install dependencies\nCOPY package.json package-lock.json* .\/\nRUN npm ci --omit=dev\n\n# Copy source code\nCOPY . .\n\n# Build the Vite client and compile the server to CJS\nRUN npm run build\n\n# Expose the port used by the Express server (default 3000)\nEXPOSE 3000\n\n# Start the server\nCMD ["node", "dist/server.cjs"]\n
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev
+
+# Copy source code
+COPY . .
+
+# Build the Vite client and compile the server to CJS
+RUN npm run build
+
+# Expose the port used by the Express server (default 3000)
+EXPOSE 3000
+
+# Start the server
+CMD ["node", "dist/server.cjs"]
