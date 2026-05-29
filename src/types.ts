@@ -68,8 +68,10 @@ export interface Sponsorship {
   id: string;
   name: string;
   organization?: string;
-  tier: string;
+  email?: string;
+  phone?: string;
   amount: number;
   website?: string;
+  message?: string;
   createdAt: string;
 }
