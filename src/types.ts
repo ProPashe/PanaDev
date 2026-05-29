@@ -8,6 +8,8 @@ export interface Project {
   githubUrl: string;
   category: string;
   status?: 'Completed' | 'In-Progress' | 'Pending';
+  order?: number;
+  createdAt: string;
   metrics: {
     stars: number;
     downloads?: string;
@@ -47,6 +49,8 @@ export interface ContactRequest {
   message: string;
   createdAt: string;
 }
+
+export type UserRole = "admin" | "editor" | "viewer";
 
 export interface SponsorshipRequest {
   id: string;

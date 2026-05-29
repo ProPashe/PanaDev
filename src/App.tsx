@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Layers, Grid3X3, Sliders, Users, Calendar, UserCheck, MessageSquare,
-  Award, ShieldCheck, Sun, Moon, Menu, X, Terminal, LogOut, Loader2
+  Award, ShieldCheck, Sun, Moon, Menu, X, Terminal, Search, LogOut, Loader2
 } from "lucide-react";
 import Home from "@/src/components/pages/Home";
 import Projects from "@/src/components/pages/Projects";
@@ -14,6 +14,7 @@ import FeedbackPage from "@/src/components/pages/Feedback";
 import ClientHub from "@/src/components/pages/ClientHub";
 import AdminDashboard from "@/src/components/pages/AdminDashboard";
 import AdminLogin from "@/src/components/pages/AdminLogin";
+import { UserRole } from "@/src/types";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -21,7 +22,7 @@ const queryClient = new QueryClient({
 
 type Tab = "home" | "projects" | "services" | "about" | "booking" | "sponsorship" | "feedback" | "admin" | "clienthub" | "admin-login";
 
-interface User { name: string; email: string; avatarUrl: string }
+interface User { name: string; email: string; avatarUrl?: string; role?: UserRole }
 interface Project {
   id: string; title: string; description: string; fullDescription: string;
   tags: string[]; deployedUrl: string; githubUrl: string; category: string;
@@ -93,6 +94,7 @@ function AppInner() {
     const authHeaders = idToken ? { Authorization: `Bearer ${idToken}` } : {};
     return fetch(`${BASE}/api${path}`, {
       ...init,
+      credentials: "include",
       headers: { "Content-Type": "application/json", ...authHeaders, ...(init?.headers || {}) }
     });
   };
@@ -101,14 +103,18 @@ function AppInner() {
   useEffect(() => {
     const checkAuthSession = async () => {
       try {
-        const res = await fetch("/api/check-auth");
+        const res = await fetch("/api/check-auth", { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.user) {
             setUser(data.user);
-            setIdToken(data.token || "session-cookie");
+            setIdToken(data.token || null);
             localStorage.setItem("panadev_user", JSON.stringify(data.user));
-            if (data.token) localStorage.setItem("panadev_token", data.token);
+            if (data.token) {
+              localStorage.setItem("panadev_token", data.token);
+            } else {
+              localStorage.removeItem("panadev_token");
+            }
             return;
           }
         }
@@ -206,7 +212,7 @@ function AppInner() {
 
   const handleSignOut = async () => {
     try {
-      await fetch("/api/admin-logout", { method: "POST" });
+      await fetch("/api/admin-logout", { method: "POST", credentials: "include" });
     } catch (err) {
       console.error("Error signing out from server:", err);
     }
@@ -308,7 +314,7 @@ function AppInner() {
     input: isDark ? "bg-slate-900 border border-slate-800 text-white placeholder-slate-500" : "bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:bg-white",
   };
 
-  const isAdmin = user?.email === "mudzimwapanashe123@gmail.com" || user?.role === "admin";
+  const canOpenAdminConsole = Boolean(user?.role);
 
   const navGroups = [
     { label: "Navigate", items: [
@@ -323,7 +329,7 @@ function AppInner() {
       { id: "feedback",   label: "Reviews",            icon: <MessageSquare className="w-4 h-4 text-purple-500" /> },
       { id: "sponsorship",label: "Sponsorship",        icon: <Award className="w-4 h-4 text-rose-500" /> },
     ]},
-    ...(isAdmin ? [{ label: "Admin", items: [
+    ...(canOpenAdminConsole ? [{ label: "Admin", items: [
       { id: "admin", label: "Admin Console", icon: <ShieldCheck className="w-4 h-4 text-blue-500" /> },
     ]}] : []),
   ];
@@ -388,7 +394,7 @@ function AppInner() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Mobile Header */}
-        <header className={`lg:hidden flex items-center justify-between px-4 py-3 border-b ${theme.sidebarHeader}`}>
+        <header className={`lg:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 border-b ${theme.sidebarHeader} bg-opacity-95 backdrop-blur-xl ${theme.bg}`}>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded bg-emerald-500 flex items-center justify-center"><Terminal className="w-3.5 h-3.5 text-black" /></div>
             <span className={`font-black text-sm font-mono ${theme.textHeading}`}>PanaDev</span>
@@ -402,6 +408,24 @@ function AppInner() {
             </button>
           </div>
         </header>
+
+        <div className="hidden lg:flex items-center justify-between gap-4 px-8 py-4 border-b border-slate-800/70 bg-[#070b13]/90 backdrop-blur-xl sticky top-0 z-30">
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-[0.32em] text-slate-500">Admin Console</p>
+            <h2 className={`text-xl font-black ${theme.textHeading}`}>Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}</h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className={`relative rounded-full border ${isDark ? "border-slate-800" : "border-slate-200"} overflow-hidden`}>
+              <input type="search" placeholder="Search dashboard..." className={`h-10 w-72 rounded-full px-4 pr-10 text-sm outline-none ${theme.input}`} />
+              <button className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500">
+                <Search className="w-4 h-4" />
+              </button>
+            </div>
+            <button className="rounded-2xl bg-emerald-500 px-4 py-2 text-xs font-bold uppercase text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400">
+              New report
+            </button>
+          </div>
+        </div>
 
         {/* Mobile Drawer */}
         {mobileSidebarOpen && (
@@ -444,7 +468,7 @@ function AppInner() {
           </button>
         </div>
 
-        <main className="flex-1 overflow-y-auto px-5 md:px-10 pb-12 pt-4 md:pt-6 max-w-5xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-10 pb-12 pt-4 md:pt-6 max-w-5xl mx-auto w-full">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <span className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />

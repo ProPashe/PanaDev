@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/admin-login
+Disallow: /api/admin-logout
+Disallow: /api/bookings
+Disallow: /api/contacts
+Disallow: /api/feedbacks
+Sitemap: https://panadev.vercel.app/sitemap.xml
+Host: panadev.vercel.app

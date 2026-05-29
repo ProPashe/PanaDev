@@ -81,6 +81,7 @@ async function sendNotification(subject: string, html: string) {
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const BASE_URL = process.env.APP_URL || "https://panadev.vercel.app";
 
 app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === "production" ? true : false,
@@ -190,6 +191,15 @@ async function updateLocalDbStatus(colName: string, id: string, status: string) 
 }
 
 // ─── Custom JWT Utilities ──────────────────────────────────────────────────────
+type UserRole = "admin" | "editor" | "viewer";
+
+interface TokenPayload {
+  role: UserRole;
+  email: string;
+  name: string;
+  exp?: number;
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? "" : "dev-secret");
 if (!JWT_SECRET) {
   throw new Error("FATAL: JWT_SECRET required in production");
@@ -202,7 +212,7 @@ function signToken(payload: object): string {
   return `${header}.${payloadStr}.${signature}`;
 }
 
-function verifyToken(token: string): any {
+function verifyToken(token: string): TokenPayload | null {
   try {
     const [headerB64, payloadB64, signature] = token.split(".");
     if (!headerB64 || !payloadB64 || !signature) return null;
@@ -210,37 +220,46 @@ function verifyToken(token: string): any {
     if (signature !== expectedSignature) return null;
     const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
     if (payload.exp && Date.now() / 1000 > payload.exp) return null;
-    return payload;
+    return payload as TokenPayload;
   } catch (err) {
     return null;
   }
 }
 
-// ─── Admin Auth Middleware ────────────────────────────────────────────────────
-async function verifyAdmin(req: any, res: any, next: any) {
-  const cookies = parseCookies(req.headers.cookie);
-  let token = cookies["admin_token"];
+function verifyRole(...allowedRoles: UserRole[]) {
+  return async (req: any, res: any, next: any) => {
+    const cookies = parseCookies(req.headers.cookie);
+    let token = cookies["admin_token"];
 
-  // Fallback to Bearer token for developer ease
-  if (!token) {
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-      token = authHeader.split("Bearer ")[1];
+    // Fallback to Bearer token for developer ease
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.split("Bearer ")[1];
+      }
     }
-  }
 
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized: No token provided." });
-  }
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: No token provided." });
+    }
 
-  const customUser = verifyToken(token);
-  if (!customUser) {
-    return res.status(401).json({ error: "Unauthorized: Invalid or expired token." });
-  }
+    const customUser = verifyToken(token);
+    if (!customUser) {
+      return res.status(401).json({ error: "Unauthorized: Invalid or expired token." });
+    }
 
-  req.adminUser = customUser;
-  next();
+    if (!allowedRoles.includes(customUser.role)) {
+      return res.status(403).json({ error: "Forbidden: Insufficient role privileges." });
+    }
+
+    req.adminUser = customUser;
+    next();
+  };
 }
+
+const verifyAdmin = verifyRole("admin");
+const verifyEditor = verifyRole("admin", "editor");
+const verifyViewer = verifyRole("admin", "editor", "viewer");
 
 // Initialize Gemini API Client lazily
 let aiClient: GoogleGenAI | null = null;
@@ -298,7 +317,10 @@ app.post("/api/admin-login", formLimiter, async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials." });
   }
 
-  const token = signToken({ role: "admin", email: expectedEmail, name: "Panashe Mudzimwa (Admin)" });
+  const allowedRoles: UserRole[] = ["admin", "editor", "viewer"];
+  const envRole = (process.env.ADMIN_ROLE || "admin").toLowerCase();
+  const userRole = allowedRoles.includes(envRole as UserRole) ? (envRole as UserRole) : "admin";
+  const token = signToken({ role: userRole, email: expectedEmail, name: "Panashe Mudzimwa (Admin)" });
 
   res.cookie("admin_token", token, {
     httpOnly: true,
@@ -313,7 +335,7 @@ app.post("/api/admin-login", formLimiter, async (req, res) => {
     user: {
       name: "Panashe Mudzimwa (Admin)",
       email: expectedEmail,
-      role: "admin"
+      role: userRole
     }
   });
 });
@@ -334,10 +356,7 @@ app.get("/api/check-auth", async (req, res) => {
   res.json({
     success: true,
     token,
-    user: {
-      ...customUser,
-      role: "admin"
-    }
+    user: customUser
   });
 });
 
@@ -371,8 +390,8 @@ app.get("/api/site-content", async (req, res) => {
   }
 });
 
-// Site Content PUT (admin only — saves editable text blocks)
-app.put("/api/site-content", verifyAdmin, async (req, res) => {
+// Site Content PUT (admin/editor — saves editable text blocks)
+app.put("/api/site-content", verifyEditor, async (req, res) => {
   try {
     const dbPath = path.join(process.cwd(), "db.json");
     const data = fs.existsSync(dbPath) ? JSON.parse(fs.readFileSync(dbPath, "utf8")) : {};
@@ -389,8 +408,8 @@ app.get("/api/projects", async (req, res) => {
   res.json(await fetchCollection("projects"));
 });
 
-// App Projects POST (admin only)
-app.post("/api/projects", formLimiter, verifyAdmin, async (req, res) => {
+// App Projects POST (admin/editor only)
+app.post("/api/projects", formLimiter, verifyEditor, async (req, res) => {
   const { id, title, description, fullDescription, tags, deployedUrl, githubUrl, category, status } = req.body;
   if (!title || !description) {
     return res.status(400).json({ error: "Missing required project fields" });
@@ -405,6 +424,7 @@ app.post("/api/projects", formLimiter, verifyAdmin, async (req, res) => {
     githubUrl: githubUrl || "",
     category: category || "Web Application",
     status: status || "Completed",
+    order: req.body.order || Number(new Date()),
     metrics: req.body.metrics || { stars: 0, downloads: "0", users: "0" },
     createdAt: new Date().toISOString()
   };
@@ -436,18 +456,37 @@ app.post("/api/projects", formLimiter, verifyAdmin, async (req, res) => {
   }
 });
 
+// App Projects UPDATE (admin/editor only)
+app.put("/api/projects/:id", verifyEditor, async (req, res) => {
+  const updateFields = { ...req.body, updatedAt: new Date().toISOString() };
+  if (!dbFirestore) {
+    try {
+      await writeToLocalDb("projects", updateFields, req.params.id);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to update project locally" });
+    }
+  }
+  try {
+    await dbFirestore.collection("projects").doc(req.params.id).update(updateFields);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update project" });
+  }
+});
+
 // App Feedbacks GET (public)
 app.get("/api/feedback", async (req, res) => {
   res.json(await fetchCollection("feedbacks"));
 });
 
-// App Bookings GET (admin only)
-app.get("/api/bookings", verifyAdmin, async (req, res) => {
+// App Bookings GET (admin/editor/viewer)
+app.get("/api/bookings", verifyViewer, async (req, res) => {
   res.json(await fetchCollection("bookings"));
 });
 
-// App Sponsorships GET (admin only)
-app.get("/api/sponsorships", verifyAdmin, async (req, res) => {
+// App Sponsorships GET (admin/editor/viewer)
+app.get("/api/sponsorships", verifyViewer, async (req, res) => {
   res.json(await fetchCollection("sponsorships"));
 });
 
@@ -620,6 +659,278 @@ app.post("/api/sponsorships", formLimiter, async (req, res) => {
 // Contacts GET (admin only)
 app.get("/api/contacts", verifyAdmin, async (req, res) => {
   res.json(await fetchCollection("contacts"));
+});
+
+// --- Export endpoints (admin only) - stream CSV with optional date filters ---
+function csvEscape(v: any) {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function parseDateFilter(range: string | undefined, from?: string | undefined, to?: string | undefined) {
+  if (from) {
+    const f = new Date(from);
+    if (!isNaN(f.getTime())) return { from: f, to: to ? new Date(to) : null };
+  }
+  if (!range || range === "all") return { from: null, to: null };
+  const days = Number(range || 0);
+  if (!days || isNaN(days)) return { from: null, to: null };
+  const toDate = new Date();
+  const fromDate = new Date();
+  fromDate.setDate(toDate.getDate() - days);
+  return { from: fromDate, to: toDate };
+}
+
+app.get("/api/export/bookings", verifyAdmin, async (req, res) => {
+  try {
+    const range = (req.query.range as string) || (req.query.r as string) || "all";
+    const { from, to } = parseDateFilter(range, req.query.from as string, req.query.to as string);
+    const page = req.query.page ? Number(req.query.page) : null;
+    const limit = req.query.limit ? Number(req.query.limit) : null;
+    const compress = (req.query.compress as string) || (req.query.c as string) || null; // 'gzip' or 'zip'
+
+    const items = await fetchCollection("bookings");
+
+    const filtered = items.filter((b: any) => {
+      if (!from) return true;
+      const raw = b.createdAt || b.date || "";
+      const dt = new Date(raw);
+      if (isNaN(dt.getTime())) return true;
+      if (to) return dt >= from && dt <= to;
+      return dt >= from;
+    });
+
+    const filenameBase = `bookings_${new Date().toISOString().split("T")[0]}`;
+    const csvFilename = `${filenameBase}.csv`;
+    const gzipFilename = `${filenameBase}.csv.gz`;
+
+    const headers = ["id","clientName","clientEmail","companyName","date","timeSlot","projectType","description","createdAt","status","budget"];
+
+    // Helper to write CSV rows to a writable stream with backpressure handling
+    async function writeRowsTo(writable: any, rows: any[]) {
+      writable.write(headers.join(",") + "\n");
+      for (const r of rows) {
+        const row = headers.map(h => csvEscape((r as any)[h] ?? "")).join(",") + "\n";
+        if (!writable.write(row)) {
+          await new Promise(rp => writable.once("drain", rp));
+        }
+      }
+    }
+
+    // Pagination support: if page+limit provided, slice accordingly
+    let toStream = filtered;
+    if (page && limit) {
+      const start = (page - 1) * limit;
+      toStream = filtered.slice(start, start + limit);
+    }
+
+    if (compress === "gzip") {
+      const zlib = require("zlib");
+      const gzip = zlib.createGzip();
+      res.setHeader("Content-Type", "application/gzip");
+      res.setHeader("Content-Disposition", `attachment; filename="${gzipFilename}"`);
+      gzip.pipe(res);
+      await writeRowsTo(gzip, toStream);
+      gzip.end();
+      return;
+    }
+
+    if (compress === "zip") {
+      let archiver: any;
+      try {
+        archiver = require("archiver");
+      } catch (e) {
+        return res.status(501).json({ error: "ZIP streaming requires 'archiver' package. Install with: npm install archiver" });
+      }
+      const stream = require("stream").PassThrough();
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.zip"`);
+      const archive = archiver("zip", { zlib: { level: 6 } });
+      archive.pipe(res);
+      archive.append(stream, { name: csvFilename });
+      // start writing rows into the passthrough stream
+      await writeRowsTo(stream, toStream);
+      stream.end();
+      await archive.finalize();
+      return;
+    }
+
+    // Default: plain CSV
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${csvFilename}"`);
+    await writeRowsTo(res, toStream);
+    res.end();
+  } catch (err) {
+    console.error("Export bookings error:", err);
+    res.status(500).json({ error: "Failed to export bookings" });
+  }
+});
+
+app.get("/api/export/projects", verifyAdmin, async (req, res) => {
+  try {
+    const range = (req.query.range as string) || (req.query.r as string) || "all";
+    const { from, to } = parseDateFilter(range, req.query.from as string, req.query.to as string);
+    const page = req.query.page ? Number(req.query.page) : null;
+    const limit = req.query.limit ? Number(req.query.limit) : null;
+    const compress = (req.query.compress as string) || (req.query.c as string) || null;
+
+    const items = await fetchCollection("projects");
+
+    const filtered = items.filter((p: any) => {
+      if (!from) return true;
+      const raw = p.createdAt || "";
+      const dt = new Date(raw);
+      if (isNaN(dt.getTime())) return true;
+      if (to) return dt >= from && dt <= to;
+      return dt >= from;
+    });
+
+    const filenameBase = `projects_${new Date().toISOString().split("T")[0]}`;
+    const csvFilename = `${filenameBase}.csv`;
+
+    const headers = ["id","title","description","category","status","deployedUrl","githubUrl","tags","createdAt"];
+
+    async function writeRowsTo(writable: any, rows: any[]) {
+      writable.write(headers.join(",") + "\n");
+      for (const r of rows) {
+        const rowVals = headers.map(h => {
+          if (h === "tags") {
+            const tags = Array.isArray(r.tags) ? r.tags.join(";") : (r.tags || "");
+            return csvEscape(tags);
+          }
+          return csvEscape((r as any)[h] ?? "");
+        }).join(",") + "\n";
+        if (!writable.write(rowVals)) {
+          await new Promise(rp => writable.once("drain", rp));
+        }
+      }
+    }
+
+    let toStream = filtered;
+    if (page && limit) {
+      const start = (page - 1) * limit;
+      toStream = filtered.slice(start, start + limit);
+    }
+
+    if (compress === "gzip") {
+      const zlib = require("zlib");
+      const gzip = zlib.createGzip();
+      res.setHeader("Content-Type", "application/gzip");
+      res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.csv.gz"`);
+      gzip.pipe(res);
+      await writeRowsTo(gzip, toStream);
+      gzip.end();
+      return;
+    }
+
+    if (compress === "zip") {
+      let archiver: any;
+      try {
+        archiver = require("archiver");
+      } catch (e) {
+        return res.status(501).json({ error: "ZIP streaming requires 'archiver' package. Install with: npm install archiver" });
+      }
+      const stream = require("stream").PassThrough();
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.zip"`);
+      const archive = archiver("zip", { zlib: { level: 6 } });
+      archive.pipe(res);
+      archive.append(stream, { name: csvFilename });
+      await writeRowsTo(stream, toStream);
+      stream.end();
+      await archive.finalize();
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${csvFilename}"`);
+    await writeRowsTo(res, toStream);
+    res.end();
+  } catch (err) {
+    console.error("Export projects error:", err);
+    res.status(500).json({ error: "Failed to export projects" });
+  }
+});
+
+app.get("/api/export/contacts", verifyAdmin, async (req, res) => {
+  try {
+    const range = (req.query.range as string) || (req.query.r as string) || "all";
+    const { from, to } = parseDateFilter(range, req.query.from as string, req.query.to as string);
+    const page = req.query.page ? Number(req.query.page) : null;
+    const limit = req.query.limit ? Number(req.query.limit) : null;
+    const compress = (req.query.compress as string) || (req.query.c as string) || null;
+
+    const items = await fetchCollection("contacts");
+
+    const filtered = items.filter((c: any) => {
+      if (!from) return true;
+      const raw = c.createdAt || "";
+      const dt = new Date(raw);
+      if (isNaN(dt.getTime())) return true;
+      if (to) return dt >= from && dt <= to;
+      return dt >= from;
+    });
+
+    const filenameBase = `contacts_${new Date().toISOString().split("T")[0]}`;
+    const csvFilename = `${filenameBase}.csv`;
+
+    const headers = ["id","name","email","phone","company","message","createdAt"];
+
+    async function writeRowsTo(writable: any, rows: any[]) {
+      writable.write(headers.join(",") + "\n");
+      for (const r of rows) {
+        const row = headers.map(h => csvEscape((r as any)[h] ?? "")).join(",") + "\n";
+        if (!writable.write(row)) {
+          await new Promise(rp => writable.once("drain", rp));
+        }
+      }
+    }
+
+    let toStream = filtered;
+    if (page && limit) {
+      const start = (page - 1) * limit;
+      toStream = filtered.slice(start, start + limit);
+    }
+
+    if (compress === "gzip") {
+      const zlib = require("zlib");
+      const gzip = zlib.createGzip();
+      res.setHeader("Content-Type", "application/gzip");
+      res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.csv.gz"`);
+      gzip.pipe(res);
+      await writeRowsTo(gzip, toStream);
+      gzip.end();
+      return;
+    }
+
+    if (compress === "zip") {
+      let archiver: any;
+      try {
+        archiver = require("archiver");
+      } catch (e) {
+        return res.status(501).json({ error: "ZIP streaming requires 'archiver' package. Install with: npm install archiver" });
+      }
+      const stream = require("stream").PassThrough();
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.zip"`);
+      const archive = archiver("zip", { zlib: { level: 6 } });
+      archive.pipe(res);
+      archive.append(stream, { name: csvFilename });
+      await writeRowsTo(stream, toStream);
+      stream.end();
+      await archive.finalize();
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${csvFilename}"`);
+    await writeRowsTo(res, toStream);
+    res.end();
+  } catch (err) {
+    console.error("Export contacts error:", err);
+    res.status(500).json({ error: "Failed to export contacts" });
+  }
 });
 
 // Admin Project DELETE
@@ -843,7 +1154,54 @@ app.post("/api/ai/seo-optimizer", async (req, res) => {
   }
 });
 
+app.get("/robots.txt", (req, res) => {
+  res.type("text/plain");
+  res.send(`User-agent: *\nAllow: /\nDisallow: /api/admin-login\nDisallow: /api/admin-logout\nDisallow: /api/bookings\nDisallow: /api/contacts\nDisallow: /api/feedbacks\nSitemap: ${BASE_URL}/sitemap.xml\nHost: ${BASE_URL.replace(/^https?:\/\//, "")}\n`);
+});
 
+app.get("/sitemap.xml", (req, res) => {
+  res.type("application/xml");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${BASE_URL}/</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.00</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/projects</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/services</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/about</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/booking</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/sponsorship</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/feedback</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.60</priority>
+  </url>
+</urlset>
+`);
+});
 
 // Launch express server with Vite middleware support (local dev only)
 async function startServer() {

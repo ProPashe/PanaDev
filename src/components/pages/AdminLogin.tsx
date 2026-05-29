@@ -40,7 +40,7 @@ export default function AdminLogin({
       
       if (res.ok && data.success) {
         onLoginSuccess(data.user, data.token);
-        showToast("Authenticated successfully as Admin! ✓", "success");
+        showToast(`Authenticated successfully as ${data.user?.role || "admin"}! ✓`, "success");
       } else {
         showToast(data.error || "Invalid email or password.", "error");
       }
