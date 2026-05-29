@@ -78,7 +78,7 @@ async function sendNotification(subject: string, html: string) {
 }
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === "production" ? true : false,
@@ -180,16 +180,86 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
+// ─── Local Database Fallback Helpers ──────────────────────────────────────────
+async function writeToLocalDb(colName: string, item: any, id?: string) {
+  const dbPath = path.join(process.cwd(), "db.json");
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, JSON.stringify({}, null, 2), "utf8");
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+    if (!data[colName]) data[colName] = [];
+    if (id) {
+      const idx = data[colName].findIndex((x: any) => x.id === id);
+      if (idx !== -1) {
+        data[colName][idx] = { ...data[colName][idx], ...item, id };
+      } else {
+        data[colName].push({ ...item, id });
+      }
+    } else {
+      data[colName].push(item);
+    }
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+  } catch (err) {
+    console.error(`Error writing to local db.json for ${colName}:`, err);
+    throw err;
+  }
+}
+
+async function deleteFromLocalDb(colName: string, id: string) {
+  const dbPath = path.join(process.cwd(), "db.json");
+  if (!fs.existsSync(dbPath)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+    if (data[colName]) {
+      data[colName] = data[colName].filter((x: any) => x.id !== id);
+      fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+    }
+  } catch (err) {
+    console.error(`Error deleting from local db.json for ${colName}:`, err);
+    throw err;
+  }
+}
+
+async function updateLocalDbStatus(colName: string, id: string, status: string) {
+  const dbPath = path.join(process.cwd(), "db.json");
+  if (!fs.existsSync(dbPath)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+    if (data[colName]) {
+      const idx = data[colName].findIndex((x: any) => x.id === id);
+      if (idx !== -1) {
+        data[colName][idx].status = status;
+        fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+      }
+    }
+  } catch (err) {
+    console.error(`Error updating local db.json for ${colName}:`, err);
+    throw err;
+  }
+}
+
 // Helper to fetch collection
 async function fetchCollection(colName: string) {
-  if (!dbFirestore) return [];
+  if (!dbFirestore) {
+    const dbPath = path.join(process.cwd(), "db.json");
+    if (fs.existsSync(dbPath)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+        return data[colName] || [];
+      } catch (err) {
+        console.error(`Error reading ${colName} from db.json fallback:`, err);
+      }
+    }
+    return [];
+  }
   const snapshot = await dbFirestore.collection(colName).get();
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
 // ─── Public Admin Login & Health Endpoints ────────────────────────────────────
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 app.post("/api/admin-login", (req, res) => {
@@ -224,7 +294,6 @@ app.post("/api/admin-login", (req, res) => {
 });
 
 app.get("/api/data", verifyAdmin, async (req, res) => {
-  if (!dbFirestore) return res.json({ bookings: [], feedbacks: [], sponsorships: [] });
   const [bookings, feedbacks, sponsorships] = await Promise.all([
     fetchCollection("bookings"),
     fetchCollection("feedbacks"),
@@ -260,7 +329,14 @@ app.post("/api/projects", formLimiter, verifyAdmin, async (req, res) => {
   };
 
   if (!dbFirestore) {
-    return res.status(500).json({ error: "Database not connected" });
+    try {
+      const projId = id || `p-${Math.random().toString(36).substring(2, 9)}`;
+      const projectWithId = { ...newProject, id: projId };
+      await writeToLocalDb("projects", projectWithId, projId);
+      return res.status(201).json(projectWithId);
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to write project locally" });
+    }
   }
 
   try {
@@ -316,6 +392,11 @@ app.post("/api/bookings", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("bookings").add(newBooking);
     (newBooking as any).id = docRef.id;
+  } else {
+    const bookId = `b-${Date.now()}`;
+    const bookingWithId = { ...newBooking, id: bookId, status: "Pending" };
+    await writeToLocalDb("bookings", bookingWithId);
+    (newBooking as any).id = bookId;
   }
 
   sendNotification(
@@ -352,6 +433,11 @@ app.post("/api/feedback", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("feedbacks").add(newFeedback);
     (newFeedback as any).id = docRef.id;
+  } else {
+    const feedbackId = `fb-${Date.now()}`;
+    const feedbackWithId = { ...newFeedback, id: feedbackId };
+    await writeToLocalDb("feedbacks", feedbackWithId);
+    (newFeedback as any).id = feedbackId;
   }
 
   res.status(201).json({ success: true, feedback: newFeedback });
@@ -375,6 +461,11 @@ app.post("/api/feedbacks", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("feedbacks").add(newFeedback);
     (newFeedback as any).id = docRef.id;
+  } else {
+    const feedbackId = `fb-${Date.now()}`;
+    const feedbackWithId = { ...newFeedback, id: feedbackId };
+    await writeToLocalDb("feedbacks", feedbackWithId);
+    (newFeedback as any).id = feedbackId;
   }
 
   res.status(201).json({ success: true, feedback: newFeedback });
@@ -390,6 +481,11 @@ app.post("/api/contacts", formLimiter, async (req, res) => {
   if (dbFirestore) {
     await dbFirestore.collection("contacts").add({
       name, email, subject, message, createdAt: new Date().toISOString()
+    });
+  } else {
+    const contactId = `c-${Date.now()}`;
+    await writeToLocalDb("contacts", {
+      id: contactId, name, email, subject, message, createdAt: new Date().toISOString()
     });
   }
 
@@ -434,6 +530,11 @@ app.post("/api/sponsorships", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("sponsorships").add(newSponsor);
     (newSponsor as any).id = docRef.id;
+  } else {
+    const spId = `s-${Date.now()}`;
+    const sponsorWithId = { ...newSponsor, id: spId };
+    await writeToLocalDb("sponsorships", sponsorWithId);
+    (newSponsor as any).id = spId;
   }
 
   sendNotification(
@@ -459,7 +560,14 @@ app.get("/api/contacts", verifyAdmin, async (req, res) => {
 
 // Admin Project DELETE
 app.delete("/api/projects/:id", verifyAdmin, async (req, res) => {
-  if (!dbFirestore) return res.status(500).json({ error: "Database not connected" });
+  if (!dbFirestore) {
+    try {
+      await deleteFromLocalDb("projects", req.params.id);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to delete project locally" });
+    }
+  }
   try {
     await dbFirestore.collection("projects").doc(req.params.id).delete();
     res.json({ success: true });
@@ -470,7 +578,14 @@ app.delete("/api/projects/:id", verifyAdmin, async (req, res) => {
 
 // Admin Feedback DELETE
 app.delete("/api/feedback/:id", verifyAdmin, async (req, res) => {
-  if (!dbFirestore) return res.status(500).json({ error: "Database not connected" });
+  if (!dbFirestore) {
+    try {
+      await deleteFromLocalDb("feedbacks", req.params.id);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to delete feedback locally" });
+    }
+  }
   try {
     await dbFirestore.collection("feedbacks").doc(req.params.id).delete();
     res.json({ success: true });
@@ -481,7 +596,14 @@ app.delete("/api/feedback/:id", verifyAdmin, async (req, res) => {
 
 // Admin Booking Status UPDATE
 app.put("/api/bookings/:id", verifyAdmin, async (req, res) => {
-  if (!dbFirestore) return res.status(500).json({ error: "Database not connected" });
+  if (!dbFirestore) {
+    try {
+      await updateLocalDbStatus("bookings", req.params.id, req.body.status);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to update booking status locally" });
+    }
+  }
   try {
     await dbFirestore.collection("bookings").doc(req.params.id).update({ status: req.body.status });
     res.json({ success: true });
@@ -492,7 +614,14 @@ app.put("/api/bookings/:id", verifyAdmin, async (req, res) => {
 
 // Admin Booking DELETE
 app.delete("/api/bookings/:id", verifyAdmin, async (req, res) => {
-  if (!dbFirestore) return res.status(500).json({ error: "Database not connected" });
+  if (!dbFirestore) {
+    try {
+      await deleteFromLocalDb("bookings", req.params.id);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to delete booking locally" });
+    }
+  }
   try {
     await dbFirestore.collection("bookings").doc(req.params.id).delete();
     res.json({ success: true });
