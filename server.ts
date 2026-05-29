@@ -14,10 +14,12 @@ dotenv.config();
 
 // ⚠️ FAIL FAST: Ensure critical env vars are set in production
 if (process.env.NODE_ENV === "production") {
-  const required = ["JWT_SECRET", "ADMIN_PASSWORD"];
-  const missing = required.filter(v => !process.env[v]);
-  if (missing.length) {
-    console.error(`FATAL: Missing required env vars: ${missing.join(", ")}`);
+  if (!process.env.JWT_SECRET) {
+    console.error("FATAL: Missing required env var: JWT_SECRET");
+    process.exit(1);
+  }
+  if (!process.env.ADMIN_PASSWORD && !process.env.ADMIN_PASSWORD_HASH) {
+    console.error("FATAL: Missing required env var: ADMIN_PASSWORD or ADMIN_PASSWORD_HASH");
     process.exit(1);
   }
 }
@@ -111,6 +113,82 @@ const aiLimiter = rateLimit({
   message: { error: "AI rate limit reached. Please wait before making more requests." }
 });
 
+// ─── Custom Cookie and Hashing Utilities ────────────────────────────────────────
+function parseCookies(cookieHeader: string | undefined): { [key: string]: string } {
+  const list: { [key: string]: string } = {};
+  if (!cookieHeader) return list;
+  cookieHeader.split(";").forEach(cookie => {
+    const parts = cookie.split("=");
+    list[parts.shift()!.trim()] = decodeURIComponent(parts.join("="));
+  });
+  return list;
+}
+
+function hashPassword(password: string): string {
+  const salt = process.env.ADMIN_SALT || "panadev_secure_salt_2026";
+  return crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
+}
+
+async function writeToLocalDb(colName: string, item: any, id?: string) {
+  const dbPath = path.join(process.cwd(), "db.json");
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, JSON.stringify({}, null, 2), "utf8");
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+    if (!data[colName]) {
+      data[colName] = [];
+    }
+    if (id) {
+      const idx = data[colName].findIndex((x: any) => x.id === id);
+      if (idx !== -1) {
+        data[colName][idx] = { ...data[colName][idx], ...item, id };
+      } else {
+        data[colName].push({ ...item, id });
+      }
+    } else {
+      data[colName].push(item);
+    }
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+  } catch (err) {
+    console.error(`Error writing to local db.json for ${colName}:`, err);
+    throw err;
+  }
+}
+
+async function deleteFromLocalDb(colName: string, id: string) {
+  const dbPath = path.join(process.cwd(), "db.json");
+  if (!fs.existsSync(dbPath)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+    if (data[colName]) {
+      data[colName] = data[colName].filter((x: any) => x.id !== id);
+      fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+    }
+  } catch (err) {
+    console.error(`Error deleting from local db.json for ${colName}:`, err);
+    throw err;
+  }
+}
+
+async function updateLocalDbStatus(colName: string, id: string, status: string) {
+  const dbPath = path.join(process.cwd(), "db.json");
+  if (!fs.existsSync(dbPath)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+    if (data[colName]) {
+      const idx = data[colName].findIndex((x: any) => x.id === id);
+      if (idx !== -1) {
+        data[colName][idx].status = status;
+        fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+      }
+    }
+  } catch (err) {
+    console.error(`Error updating local db.json for ${colName}:`, err);
+    throw err;
+  }
+}
+
 // ─── Custom JWT Utilities ──────────────────────────────────────────────────────
 const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? "" : "dev-secret");
 if (!JWT_SECRET) {
@@ -140,11 +218,20 @@ function verifyToken(token: string): any {
 
 // ─── Admin Auth Middleware ────────────────────────────────────────────────────
 async function verifyAdmin(req: any, res: any, next: any) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
+  const cookies = parseCookies(req.headers.cookie);
+  let token = cookies["admin_token"];
+
+  // Fallback to Bearer token for developer ease
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.split("Bearer ")[1];
+    }
+  }
+
+  if (!token) {
     return res.status(401).json({ error: "Unauthorized: No token provided." });
   }
-  const token = authHeader.split("Bearer ")[1];
 
   const customUser = verifyToken(token);
   if (!customUser) {
@@ -185,29 +272,82 @@ async function fetchCollection(colName: string) {
 }
 
 app.post("/api/admin-login", formLimiter, async (req, res) => {
-  const { password } = req.body;
-  if (!password || typeof password !== "string") {
-    return res.status(400).json({ error: "Password required." });
+  const { email, password } = req.body;
+  if (!email || !password || typeof email !== "string" || typeof password !== "string") {
+    return res.status(400).json({ error: "Email and password required." });
   }
 
+  const expectedEmail = process.env.ADMIN_EMAIL || "mudzimwapanashe123@gmail.com";
   const expectedPassword = process.env.ADMIN_PASSWORD;
-  if (!expectedPassword) {
-    return res.status(500).json({ error: "Admin login is not configured." });
-  }
+  const expectedPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-  if (password !== expectedPassword) {
+  if (email.toLowerCase() !== expectedEmail.toLowerCase()) {
     return res.status(401).json({ error: "Invalid credentials." });
   }
 
-  const token = signToken({ role: "admin", email: "mudzimwapanashe123@gmail.com", name: "Panashe Mudzimwa (Admin)" });
+  let isMatch = false;
+  if (expectedPasswordHash) {
+    isMatch = hashPassword(password) === expectedPasswordHash;
+  } else if (expectedPassword) {
+    isMatch = password === expectedPassword;
+  } else {
+    return res.status(500).json({ error: "Admin login is not configured on the server." });
+  }
+
+  if (!isMatch) {
+    return res.status(401).json({ error: "Invalid credentials." });
+  }
+
+  const token = signToken({ role: "admin", email: expectedEmail, name: "Panashe Mudzimwa (Admin)" });
+
+  res.cookie("admin_token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+
   res.json({
     success: true,
     token,
     user: {
       name: "Panashe Mudzimwa (Admin)",
-      email: "mudzimwapanashe123@gmail.com"
+      email: expectedEmail,
+      role: "admin"
     }
   });
+});
+
+app.get("/api/check-auth", async (req, res) => {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies["admin_token"];
+
+  if (!token) {
+    return res.status(401).json({ success: false, error: "Unauthorized: No active session." });
+  }
+
+  const customUser = verifyToken(token);
+  if (!customUser) {
+    return res.status(401).json({ success: false, error: "Unauthorized: Invalid or expired session." });
+  }
+
+  res.json({
+    success: true,
+    token,
+    user: {
+      ...customUser,
+      role: "admin"
+    }
+  });
+});
+
+app.post("/api/admin-logout", (req, res) => {
+  res.clearCookie("admin_token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax"
+  });
+  res.json({ success: true, message: "Logged out successfully." });
 });
 
 app.get("/api/data", verifyAdmin, async (req, res) => {

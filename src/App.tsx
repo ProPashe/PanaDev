@@ -13,12 +13,13 @@ import Sponsorship from "@/src/components/pages/Sponsorship";
 import FeedbackPage from "@/src/components/pages/Feedback";
 import ClientHub from "@/src/components/pages/ClientHub";
 import AdminDashboard from "@/src/components/pages/AdminDashboard";
+import AdminLogin from "@/src/components/pages/AdminLogin";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
 
-type Tab = "home" | "projects" | "services" | "about" | "booking" | "sponsorship" | "feedback" | "admin" | "clienthub";
+type Tab = "home" | "projects" | "services" | "about" | "booking" | "sponsorship" | "feedback" | "admin" | "clienthub" | "admin-login";
 
 interface User { name: string; email: string; avatarUrl: string }
 interface Project {
@@ -42,7 +43,15 @@ function AppInner() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
+  const [isSignInModalOpen, _setIsSignInModalOpen] = useState(false);
+  const setIsSignInModalOpen = (open: boolean) => {
+    if (open) {
+      setActiveTab("admin-login");
+      window.history.pushState({}, "", "/admin-portal");
+    } else {
+      _setIsSignInModalOpen(false);
+    }
+  };
   const [signInName, setSignInName] = useState("");
   const [signInEmail, setSignInEmail] = useState("");
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -80,33 +89,59 @@ function AppInner() {
     });
   };
 
-  // Auth initialization: restore admin session from localStorage
+  // Auth initialization: verify session with backend
   useEffect(() => {
-    const stored = localStorage.getItem("panadev_user");
-    if (stored) {
+    const checkAuthSession = async () => {
       try {
-        const storedUser = JSON.parse(stored);
-        setUser(storedUser);
-      } catch {}
-    }
+        const res = await fetch("/api/check-auth");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.user) {
+            setUser(data.user);
+            setIdToken(data.token || "session-cookie");
+            localStorage.setItem("panadev_user", JSON.stringify(data.user));
+            if (data.token) localStorage.setItem("panadev_token", data.token);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Error checking auth session:", err);
+      }
+      // If check-auth fails, clear any old local storage
+      setUser(null);
+      setIdToken(null);
+      localStorage.removeItem("panadev_user");
+      localStorage.removeItem("panadev_token");
+    };
 
-    const storedToken = localStorage.getItem("panadev_token");
-    if (storedToken) setIdToken(storedToken);
-    setAuthChecked(true);
+    checkAuthSession().finally(() => setAuthChecked(true));
   }, []);
 
-  // Token refresh interval for admin session
+  // Secret login URL path detection & Redirection gate
   useEffect(() => {
-    if (!user || !idToken) return;
-    const refreshInterval = setInterval(() => {
-      const token = localStorage.getItem("panadev_token");
-      if (token) {
-        setIdToken(token);
+    const handlePathAndGates = () => {
+      const path = window.location.pathname;
+      if (path === "/admin-portal" || path === "/manage") {
+        if (user) {
+          if (activeTab !== "admin") {
+            setActiveTab("admin");
+          }
+        } else {
+          if (activeTab !== "admin-login") {
+            setActiveTab("admin-login");
+          }
+        }
+      } else if (activeTab === "admin" && !user) {
+        // Redirection gate: block access to admin panel if not authenticated
+        setActiveTab("home");
+        showToast("Access Denied: Administrative session context required.", "error");
       }
-    }, 55 * 60 * 1000);
+    };
 
-    return () => clearInterval(refreshInterval);
-  }, [user, idToken]);
+    if (authChecked) {
+      handlePathAndGates();
+    }
+  }, [window.location.pathname, activeTab, user, authChecked]);
 
   // Load theme
   useEffect(() => {
@@ -157,44 +192,21 @@ function AppInner() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const handlePasswordLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminPassword) {
-      showToast("Please enter the admin password.", "error");
-      return;
-    }
-    try {
-      setAuthLoading(true);
-      const res = await fetch("/api/admin-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setIdToken(data.token);
-        setUser(data.user);
-        localStorage.setItem("panadev_token", data.token);
-        localStorage.setItem("panadev_user", JSON.stringify(data.user));
-        setIsSignInModalOpen(false);
-        setAdminPassword("");
-        showToast("Signed in successfully as Admin! ✓");
-      } else {
-        showToast(data.error || "Invalid admin password.", "error");
-      }
-    } catch (err: any) {
-      console.error(err);
-      showToast("Network error signing in. Please check connection.", "error");
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
   const handleSignOut = async () => {
+    try {
+      await fetch("/api/admin-logout", { method: "POST" });
+    } catch (err) {
+      console.error("Error signing out from server:", err);
+    }
     setUser(null);
     setIdToken(null);
     localStorage.removeItem("panadev_user");
     localStorage.removeItem("panadev_token");
+    setActiveTab("home");
+    // If the path was secret, clear the URL to /
+    if (window.location.pathname === "/admin-portal" || window.location.pathname === "/manage") {
+      window.history.replaceState({}, "", "/");
+    }
     showToast("Signed out successfully.");
   };
 
@@ -284,7 +296,7 @@ function AppInner() {
     input: isDark ? "bg-slate-900 border border-slate-800 text-white placeholder-slate-500" : "bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:bg-white",
   };
 
-  const isAdmin = user?.email === "mudzimwapanashe123@gmail.com";
+  const isAdmin = user?.email === "mudzimwapanashe123@gmail.com" || user?.role === "admin";
 
   const navGroups = [
     { label: "Navigate", items: [
@@ -343,8 +355,8 @@ function AppInner() {
             </div>
           ))}
         </nav>
-        <div className={`px-4 py-4 ${theme.sidebarFooter}`}>
-          {user ? (
+        {user && (
+          <div className={`px-4 py-4 ${theme.sidebarFooter}`}>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[9px] font-mono shrink-0">{user.name[0]}</div>
@@ -357,12 +369,8 @@ function AppInner() {
                 <LogOut className="w-3 h-3" /><span>Sign Out</span>
               </button>
             </div>
-          ) : (
-            <button onClick={() => setIsSignInModalOpen(true)} data-testid="btn-signin" className="w-full py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg text-center font-bold font-mono text-[10px] uppercase hover:bg-emerald-500/20 transition cursor-pointer">
-              Admin Login
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </aside>
 
       {/* Main content */}
@@ -405,13 +413,13 @@ function AppInner() {
                   </div>
                 ))}
               </nav>
-              <div className={`px-4 py-4 ${theme.sidebarFooter}`}>
-                {user ? (
-                  <button onClick={handleSignOut} className="text-rose-400 text-[10px] font-mono font-bold"><LogOut className="w-3 h-3 inline mr-1" />Sign Out</button>
-                ) : (
-                  <button onClick={() => { setMobileSidebarOpen(false); setIsSignInModalOpen(true); }} className="w-full py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg text-center font-bold font-mono text-[10px] uppercase cursor-pointer">Sign In</button>
-                )}
-              </div>
+              {user && (
+                <div className={`px-4 py-4 ${theme.sidebarFooter}`}>
+                  <button onClick={() => { setMobileSidebarOpen(false); handleSignOut(); }} className="text-rose-450 text-[10px] font-mono font-bold">
+                    <LogOut className="w-3 h-3 inline mr-1" />Sign Out
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex-1 bg-slate-950/80" onClick={() => setMobileSidebarOpen(false)} />
           </div>
@@ -441,6 +449,21 @@ function AppInner() {
               {activeTab === "feedback" && <FeedbackPage isDark={isDark} theme={theme} feedbacks={feedbacks} projects={projects} feedbackForm={feedbackForm} setFeedbackForm={setFeedbackForm} handleFeedbackSubmit={handleFeedbackSubmit} feedbackLoading={feedbackLoading} user={user} setIsSignInModalOpen={setIsSignInModalOpen} setActiveTab={setActiveTab} />}
               {activeTab === "clienthub" && <ClientHub isDark={isDark} theme={theme} projects={projects} bookings={bookings} user={user} showToast={showToast} setIsSignInModalOpen={setIsSignInModalOpen} setActiveTab={setActiveTab} />}
               {activeTab === "admin" && <AdminDashboard isDark={isDark} theme={theme} projects={projects} setProjects={setProjects} feedbacks={feedbacks} setFeedbacks={setFeedbacks} bookings={bookings} setBookings={setBookings} user={user} showToast={showToast} setActiveTab={setActiveTab} apiFetch={apiFetch} />}
+              {activeTab === "admin-login" && (
+                <AdminLogin 
+                  isDark={isDark} 
+                  theme={theme} 
+                  onLoginSuccess={(usr, tok) => {
+                    setUser(usr);
+                    setIdToken(tok);
+                    localStorage.setItem("panadev_user", JSON.stringify(usr));
+                    localStorage.setItem("panadev_token", tok);
+                    setActiveTab("admin");
+                  }} 
+                  showToast={showToast} 
+                  setActiveTab={setActiveTab} 
+                />
+              )}
             </>
           )}
         </main>
@@ -455,60 +478,9 @@ function AppInner() {
         </footer>
       </div>
 
-      {/* Sign In Modal */}
+      {/* Sign In Modal (Placeholder for backward-compatibility with modal closure clicks) */}
       {isSignInModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsSignInModalOpen(false)}>
-          <div className={`w-full max-w-sm rounded-2xl border ${theme.card} p-8 space-y-6 text-center`} onClick={e => e.stopPropagation()}>
-            <button onClick={() => setIsSignInModalOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-rose-400"><X className="w-4 h-4" /></button>
-            
-            {/* Logo & Title */}
-            <div className="space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 p-[1px] mx-auto shadow-lg shadow-emerald-500/10">
-                <div className="w-full h-full rounded-2xl bg-slate-950 flex items-center justify-center">
-                  <Terminal className="w-6 h-6 text-emerald-400" />
-                </div>
-              </div>
-              <h3 className={`text-base font-extrabold font-mono tracking-tight ${theme.textHeading}`}>Admin Passcode</h3>
-              <p className={`text-[11px] ${theme.textMuted} max-w-[240px] mx-auto leading-relaxed`}>
-                Enter the security key to authenticate your session.
-              </p>
-            </div>
-
-            {/* Password Login Form */}
-            <form onSubmit={handlePasswordLogin} className="space-y-4 text-left">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block pl-1">Passkey</label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    placeholder="••••••••••••"
-                    value={adminPassword}
-                    onChange={e => setAdminPassword(e.target.value)}
-                    disabled={authLoading}
-                    className={`w-full py-2.5 pl-10 pr-4 rounded-xl border bg-slate-900/50 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono placeholder-slate-600 ${isDark ? "border-slate-800 hover:border-slate-700 focus:border-emerald-500/50" : "border-slate-200 hover:border-slate-300 focus:border-emerald-500/50"}`}
-                  />
-                  <ShieldCheck className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs font-mono tracking-wider uppercase transition shadow-lg shadow-emerald-500/20 active:scale-[0.98] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {authLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <span>Authenticate ✓</span>
-                )}
-              </button>
-            </form>
-
-            <p className={`text-[10px] ${theme.textMuted}`}>
-              Only <span className="text-emerald-500 font-mono font-bold">mudzimwapanashe123@gmail.com</span> has admin access.
-            </p>
-          </div>
-        </div>
+        <div className="hidden" />
       )}
 
       {/* WhatsApp Success Modal */}

@@ -59,7 +59,7 @@ export default function AdminDashboard({
   const SUPER_ADMIN_EMAIL = "mudzimwapanashe123@gmail.com";
   const [isAdminBypassed, setIsAdminBypassed] = useState<boolean>(false); // Restricted by default!
 
-  const isAuthorized = user?.email === SUPER_ADMIN_EMAIL || isAdminBypassed;
+  const isAuthorized = user?.email === SUPER_ADMIN_EMAIL || user?.role === "admin" || isAdminBypassed;
 
   // Tabs for sub-data
   const [adminTab, setAdminTab] = useState<"analytics" | "projects" | "bookings" | "feedbacks" | "sponsorships">("analytics");
@@ -147,7 +147,7 @@ export default function AdminDashboard({
   // Project CRUD operations
   const handleAddNewProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (user?.email !== SUPER_ADMIN_EMAIL) {
+    if (user?.email !== SUPER_ADMIN_EMAIL && user?.role !== "admin") {
       showToast("Access Denied: Only the portfolio administrator can create projects.", "error");
       return;
     }
@@ -200,7 +200,7 @@ export default function AdminDashboard({
   };
 
   const handleDeleteProject = async (id: string) => {
-    if (user?.email !== SUPER_ADMIN_EMAIL) {
+    if (user?.email !== SUPER_ADMIN_EMAIL && user?.role !== "admin") {
       showToast("Access Denied: Only the portfolio administrator can delete projects.", "error");
       return;
     }
