@@ -790,7 +790,7 @@ export default function AdminDashboard({
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-[10px] mb-1 font-bold">TAG CLOUD CODES (COMMA SEPARATED)</label>
+                  <label className="block text-[10px] mb-1 font-bold">TAG CLOUD CODES (OPTIONAL)</label>
                   <input 
                     type="text" 
                     placeholder="React, Express, LocalDB" 
@@ -800,7 +800,7 @@ export default function AdminDashboard({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] mb-1 font-bold">LIVE RE-ROUTING LINK</label>
+                  <label className="block text-[10px] mb-1 font-bold">LIVE RE-ROUTING LINK (OPTIONAL)</label>
                   <input 
                     type="url" 
                     placeholder="https://ais-pre-t26..." 
@@ -810,7 +810,7 @@ export default function AdminDashboard({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] mb-1 font-bold">GITHUB REPOSITORY TARGET</label>
+                  <label className="block text-[10px] mb-1 font-bold">GITHUB REPOSITORY TARGET (OPTIONAL)</label>
                   <input 
                     type="url" 
                     placeholder="https://github.com..." 

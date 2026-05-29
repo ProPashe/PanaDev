@@ -389,7 +389,7 @@ app.post("/api/projects", formLimiter, verifyAdmin, async (req, res) => {
       const projId = id || `p-${Math.random().toString(36).substring(2, 9)}`;
       const projectWithId = { ...newProject, id: projId };
       await writeToLocalDb("projects", projectWithId, projId);
-      return res.status(201).json(projectWithId);
+      return res.status(201).json({ success: true, project: projectWithId });
     } catch (err) {
       return res.status(500).json({ error: "Failed to write project locally" });
     }
@@ -405,7 +405,7 @@ app.post("/api/projects", formLimiter, verifyAdmin, async (req, res) => {
       docRef = await dbFirestore.collection("projects").add(newProject);
       (newProject as any).id = docRef.id;
     }
-    res.status(201).json(newProject);
+    res.status(201).json({ success: true, project: newProject });
   } catch (err) {
     res.status(500).json({ error: "Failed to create project" });
   }
