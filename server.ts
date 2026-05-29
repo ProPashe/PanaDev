@@ -359,6 +359,31 @@ app.get("/api/data", verifyAdmin, async (req, res) => {
   res.json({ bookings, feedbacks, sponsorships });
 });
 
+// Site Content GET (public — pages read their text from here)
+app.get("/api/site-content", async (req, res) => {
+  try {
+    const dbPath = path.join(process.cwd(), "db.json");
+    if (!fs.existsSync(dbPath)) return res.json({});
+    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+    res.json(data.siteContent || {});
+  } catch {
+    res.json({});
+  }
+});
+
+// Site Content PUT (admin only — saves editable text blocks)
+app.put("/api/site-content", verifyAdmin, async (req, res) => {
+  try {
+    const dbPath = path.join(process.cwd(), "db.json");
+    const data = fs.existsSync(dbPath) ? JSON.parse(fs.readFileSync(dbPath, "utf8")) : {};
+    data.siteContent = { ...(data.siteContent || {}), ...req.body, updatedAt: new Date().toISOString() };
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+    res.json({ success: true, content: data.siteContent });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to save site content" });
+  }
+});
+
 // App Projects GET (public)
 app.get("/api/projects", async (req, res) => {
   res.json(await fetchCollection("projects"));

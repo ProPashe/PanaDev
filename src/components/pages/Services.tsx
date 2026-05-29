@@ -9,9 +9,17 @@ interface ServicesProps {
   isDark: boolean;
   theme: any;
   setActiveTab: (tab: any) => void;
+  siteContent?: {
+    aboutCompany: string;
+    aboutFounder: string;
+    servicesTagline: string;
+    contactEmail: string;
+    contactPhone: string;
+    companyLocation: string;
+  };
 }
 
-export default function Services({ isDark, theme, setActiveTab }: ServicesProps) {
+export default function Services({ isDark, theme, setActiveTab, siteContent }: ServicesProps) {
   
   const developmentPhases = [
     {
@@ -119,7 +127,7 @@ export default function Services({ isDark, theme, setActiveTab }: ServicesProps)
             Professional Services Matrix
           </h2>
           <p className={`${theme.textMuted} text-sm max-w-xl mt-3 leading-relaxed`}>
-            We design, develop, and maintain custom digital systems crafted with absolute precision to drive measurable business growth across Africa and globally.
+            {siteContent?.servicesTagline || "We design, develop, and maintain custom digital systems crafted with absolute precision to drive measurable business growth across Africa and globally."}
           </p>
         </div>
         <button

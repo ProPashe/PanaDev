@@ -64,6 +64,14 @@ function AppInner() {
   const [sponsorships, setSponsorships] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
+  const [siteContent, setSiteContent] = useState({
+    aboutCompany: "PanaDev Apps is a growing Zimbabwean technology company focused on building modern, secure, and scalable digital solutions. We create software that helps businesses, organizations, and individuals work smarter through mobile apps, websites, AI systems, and custom software. Our goal is to develop high-quality digital products that close the technology gap between Africa and the rest of the world.",
+    aboutFounder: "My name is Panashe Mudzimwa, and I was born in Chipinge, Manicaland Province, Zimbabwe. My passion for technology started early. In 2020, while I was still in O-Level, I first interacted with computers and immediately became interested in how software works.",
+    servicesTagline: "We design, develop, and maintain custom digital systems crafted with absolute precision to drive measurable business growth across Africa and globally.",
+    contactEmail: "mudzimwapanashe123@gmail.com",
+    contactPhone: "+263 713 058 383",
+    companyLocation: "Harare, Zimbabwe"
+  });
 
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -164,14 +172,18 @@ function AppInner() {
     }
   }, [user]);
 
-  // Fetch public data (projects + feedbacks)
+  // Fetch public data (projects + feedbacks + site content)
   useEffect(() => {
     Promise.all([
       apiFetch("/projects").then(r => r.json()).catch(() => []),
       apiFetch("/feedback").then(r => r.json()).catch(() => []),
-    ]).then(([p, f]) => {
+      apiFetch("/site-content").then(r => r.json()).catch(() => ({})),
+    ]).then(([p, f, c]) => {
       setProjects(Array.isArray(p) ? p : []);
       setFeedbacks(Array.isArray(f) ? f : []);
+      if (c && typeof c === "object" && !Array.isArray(c)) {
+        setSiteContent(prev => ({ ...prev, ...c }));
+      }
     }).finally(() => setIsLoading(false));
   }, []);
 
@@ -442,8 +454,8 @@ function AppInner() {
             <>
               {activeTab === "home" && <Home isDark={isDark} theme={theme} setActiveTab={setActiveTab} projects={projects} feedbacks={feedbacks} setSelectedProjectId={setSelectedProjectId} />}
               {activeTab === "projects" && <Projects isDark={isDark} theme={theme} projects={projects} feedbacks={feedbacks} selectedProjectId={selectedProjectId} setSelectedProjectId={setSelectedProjectId} handleFeedbackSubmit={handleFeedbackSubmit} feedbackForm={feedbackForm} setFeedbackForm={setFeedbackForm} feedbackLoading={feedbackLoading} user={user} setIsSignInModalOpen={setIsSignInModalOpen} />}
-              {activeTab === "services" && <Services isDark={isDark} theme={theme} setActiveTab={setActiveTab} />}
-              {activeTab === "about" && <About isDark={isDark} theme={theme} setActiveTab={setActiveTab} />}
+              {activeTab === "services" && <Services isDark={isDark} theme={theme} setActiveTab={setActiveTab} siteContent={siteContent} />}
+              {activeTab === "about" && <About isDark={isDark} theme={theme} setActiveTab={setActiveTab} siteContent={siteContent} />}
               {activeTab === "booking" && <Bookings isDark={isDark} theme={theme} bookings={bookings} bookingForm={bookingForm} setBookingForm={setBookingForm} handleBookingSubmit={handleBookingSubmit} bookingLoading={bookingLoading} user={user} setIsSignInModalOpen={setIsSignInModalOpen} setActiveTab={setActiveTab} />}
               {activeTab === "sponsorship" && <Sponsorship isDark={isDark} theme={theme} sponsorships={sponsorships} sponsorForm={sponsorForm} setSponsorForm={setSponsorForm} handleSponsorSubmit={handleSponsorSubmit} sponsorLoading={sponsorLoading} user={user} setIsSignInModalOpen={setIsSignInModalOpen} setActiveTab={setActiveTab} />}
               {activeTab === "feedback" && <FeedbackPage isDark={isDark} theme={theme} feedbacks={feedbacks} projects={projects} feedbackForm={feedbackForm} setFeedbackForm={setFeedbackForm} handleFeedbackSubmit={handleFeedbackSubmit} feedbackLoading={feedbackLoading} user={user} setIsSignInModalOpen={setIsSignInModalOpen} setActiveTab={setActiveTab} />}
@@ -470,11 +482,11 @@ function AppInner() {
 
         <footer className={`py-6 border-t flex flex-col items-center justify-center gap-3 text-center text-[10px] font-mono ${theme.sidebarFooter}`}>
           <div className="flex gap-4">
-            <a href="https://wa.me/263713058383" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-emerald-500 transition-colors">WhatsApp</a>
-            <a href="mailto:mudzimwapanashe123@gmail.com" className="text-slate-400 hover:text-[#0ea5e9] transition-colors">Email</a>
+            <a href={`https://wa.me/${siteContent.contactPhone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-emerald-500 transition-colors">WhatsApp</a>
+            <a href={`mailto:${siteContent.contactEmail}`} className="text-slate-400 hover:text-[#0ea5e9] transition-colors">Email</a>
             <a href="https://github.com/ProPashe" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-slate-200 transition-colors">GitHub</a>
           </div>
-          <p>© 2026 PanaDev Apps. All rights reserved. | Harare, Zimbabwe</p>
+          <p>© 2026 PanaDev Apps. All rights reserved. | {siteContent.companyLocation}</p>
         </footer>
       </div>
 
@@ -507,7 +519,7 @@ function AppInner() {
 
       {/* Floating WhatsApp Button */}
       <a 
-        href="https://wa.me/263713058383?text=Hello%20PanaDev!%20I%20would%20like%20to%20discuss%20a%20project." 
+        href={`https://wa.me/${siteContent.contactPhone.replace(/\D/g, "")}?text=Hello%20PanaDev!%20I%20would%20like%20to%20discuss%20a%20project.`}
         target="_blank" 
         rel="noreferrer"
         className="fixed bottom-6 left-6 z-40 bg-[#25D366] hover:bg-[#1ebe5d] text-white p-3.5 rounded-full shadow-[0_4px_14px_rgba(37,211,102,0.4)] transition-transform hover:scale-110 flex items-center justify-center group"

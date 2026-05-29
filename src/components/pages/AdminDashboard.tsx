@@ -55,14 +55,23 @@ export default function AdminDashboard({
   setActiveTab,
   apiFetch
 }: AdminDashboardProps) {
-  // Admin Authorization Gate
+  // Admin Authorization — handled by JWT login, always authorized here
   const SUPER_ADMIN_EMAIL = "mudzimwapanashe123@gmail.com";
-  const [isAdminBypassed, setIsAdminBypassed] = useState<boolean>(false); // Restricted by default!
-
-  const isAuthorized = user?.email === SUPER_ADMIN_EMAIL || user?.role === "admin" || isAdminBypassed;
+  const isAuthorized = true; // Protected by /admin-portal login page
 
   // Tabs for sub-data
-  const [adminTab, setAdminTab] = useState<"analytics" | "projects" | "bookings" | "feedbacks" | "sponsorships">("analytics");
+  const [adminTab, setAdminTab] = useState<"analytics" | "projects" | "bookings" | "feedbacks" | "sponsorships" | "content">("analytics");
+
+  // Site Content editing state
+  const [contentLoading, setContentLoading] = useState(false);
+  const [siteContent, setSiteContent] = useState({
+    aboutCompany: "PanaDev Apps is a growing Zimbabwean technology company focused on building modern, secure, and scalable digital solutions. We create software that helps businesses, organizations, and individuals work smarter through mobile apps, websites, AI systems, and custom software.",
+    aboutFounder: "My name is Panashe Mudzimwa, and I was born in Chipinge, Manicaland Province, Zimbabwe. My passion for technology started early. In 2020, while I was still in O-Level, I first interacted with computers and immediately became interested in how software works.",
+    servicesTagline: "We design, develop, and maintain custom digital systems crafted with absolute precision to drive measurable business growth across Africa and globally.",
+    contactEmail: "mudzimwapanashe123@gmail.com",
+    contactPhone: "+263 713 058 383",
+    companyLocation: "Harare, Zimbabwe"
+  });
 
   // State arrays fetched via APIs
   const [sponsorships, setSponsorships] = useState<SponsorshipRequest[]>([]);
@@ -142,15 +151,11 @@ export default function AdminDashboard({
       fetchAdminLogs();
       fetchInsights();
     }
-  }, [isAuthorized]);
+  }, []);
 
   // Project CRUD operations
   const handleAddNewProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (user?.email !== SUPER_ADMIN_EMAIL && user?.role !== "admin") {
-      showToast("Access Denied: Only the portfolio administrator can create projects.", "error");
-      return;
-    }
 
     if (!newProjForm.title || !newProjForm.description || !newProjForm.fullDescription) {
       showToast("Please provide all required project fields.", "error");
@@ -200,10 +205,6 @@ export default function AdminDashboard({
   };
 
   const handleDeleteProject = async (id: string) => {
-    if (user?.email !== SUPER_ADMIN_EMAIL && user?.role !== "admin") {
-      showToast("Access Denied: Only the portfolio administrator can delete projects.", "error");
-      return;
-    }
 
     if (!window.confirm("Are you sure you want to completely erase this project from database? This cannot be undone.")) return;
     try {
@@ -275,39 +276,38 @@ export default function AdminDashboard({
     }
   };
 
+  // Site content fetch on mount
+  useEffect(() => {
+    apiFetch("/site-content").then(r => r.json()).then(data => {
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        setSiteContent(prev => ({ ...prev, ...data }));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleSaveContent = async () => {
+    try {
+      setContentLoading(true);
+      const res = await apiFetch("/site-content", {
+        method: "PUT",
+        body: JSON.stringify(siteContent)
+      });
+      if (res.ok) {
+        showToast("Site content saved successfully!");
+      } else {
+        showToast("Failed to save content.", "error");
+      }
+    } catch {
+      showToast("Error saving content.", "error");
+    } finally {
+      setContentLoading(false);
+    }
+  };
+
   // Analytics helper maps
-  const totalFundingCollected = sponsorships.reduce((sum, sp) => sum + sp.fundingAmount, 0);
+  const totalFundingCollected = sponsorships.reduce((sum, sp) => sum + (Number(sp.fundingAmount) || 0), 0);
 
-  if (!isAuthorized) {
-    return (
-      <div className="max-w-md mx-auto py-16 text-center space-y-6">
-        <div className="p-4 rounded-full bg-rose-500/10 border border-rose-500/20 w-16 h-16 flex items-center justify-center mx-auto">
-          <ShieldAlert className="w-8 h-8 text-rose-500 animate-pulse" />
-        </div>
-        <div className="space-y-2">
-          <h2 className={`text-xl font-extrabold ${theme.textHeading} font-mono uppercase`}>
-            Administrative Locker
-          </h2>
-          <p className={`${theme.textMuted} text-xs font-sans max-w-sm mx-auto leading-relaxed`}>
-            Administrative access is restricted to official developer nodes: <b className="text-emerald-400 font-mono text-[11px]">{SUPER_ADMIN_EMAIL}</b>. Please sign in with Google using that email address.
-          </p>
-        </div>
-
-        {/* Demo audit developers bypass option */}
-        <div className={`p-5 rounded-2xl border ${theme.cardInner} space-y-3`}>
-          <p className="text-[10px] text-zinc-400 font-mono leading-normal">
-            ⚙️ IFA-BYPASS MODE AVAILABLE: If testing inside AI-Studio preview clusters, toggle verification bypass to review and test the dashboard.
-          </p>
-          <button
-            onClick={() => setIsAdminBypassed(true)}
-            className="w-full bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-400 border border-emerald-500/30 py-2.5 rounded-lg font-bold font-mono text-xs uppercase transition cursor-pointer"
-          >
-            Activate Developers Bypass Trigger
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Auth is handled by the /admin-portal login — no gate needed here
 
   return (
     <div className="space-y-10 py-4 animate-fade-in text-left">
@@ -354,11 +354,12 @@ export default function AdminDashboard({
       {/* Admin Tab Selectors */}
       <div className="flex flex-wrap gap-2 text-xs font-mono">
         {[
-          { id: "analytics", label: "📊 Analytics Ledger", count: null },
-          { id: "projects", label: "📁 Projects Portfolio", count: projects.length },
-          { id: "bookings", label: "📅 Reservations Ledger", count: bookings.length },
-          { id: "feedbacks", label: "💬 Feedbacks Audit", count: feedbacks.length },
-          { id: "sponsorships", label: "💰 Partnerships Registry", count: sponsorships.length }
+          { id: "analytics", label: "📊 Analytics", count: null },
+          { id: "projects", label: "📁 Projects", count: projects.length },
+          { id: "bookings", label: "📅 Reservations", count: bookings.length },
+          { id: "feedbacks", label: "💬 Feedbacks", count: feedbacks.length },
+          { id: "sponsorships", label: "💰 Partnerships", count: sponsorships.length },
+          { id: "content", label: "✏️ Site Content", count: null }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -366,7 +367,7 @@ export default function AdminDashboard({
             className={`px-3 py-1.5 rounded-lg border transition cursor-pointer text-left ${
               adminTab === tab.id 
                 ? "bg-slate-900 border-emerald-500 text-emerald-400 font-bold" 
-                : isDark ? "bg-slate-950 border-slate-900 text-slate-400 hover:text-white" : "bg-white border-slate-205 text-slate-600 hover:bg-slate-50"
+                : isDark ? "bg-slate-950 border-slate-900 text-slate-400 hover:text-white" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
             }`}
           >
             {tab.label} {tab.count !== null && `[${tab.count}]`}
@@ -697,30 +698,23 @@ export default function AdminDashboard({
         </div>
       )}
 
-      {/* PROJECTS MANAGEMENT PORTTAB */}
+      {/* PROJECTS MANAGEMENT TAB */}
       {adminTab === "projects" && (
         <div className="space-y-6 animate-fade-in text-left">
           <div className="flex justify-between items-center text-xs font-mono">
             <span className="text-[10px] uppercase text-slate-500 font-bold">Manage Portfolios Sandbox Lists</span>
-            {user?.email === SUPER_ADMIN_EMAIL ? (
-              <button
-                onClick={() => setIsAddingProject(!isAddingProject)}
-                className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-450 text-black py-1.5 px-3 rounded-lg font-bold text-xs cursor-pointer text-left select-none"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[3px]" />
-                {isAddingProject ? "Close Builder Panel" : "Create New Project Node"}
-              </button>
-            ) : (
-              <div className="text-[10px] text-amber-500 bg-amber-950/10 border border-amber-900/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                <ShieldAlert className="w-3.5 h-3.5 animate-pulse text-amber-500" />
-                <span>Registry Restricted to Owner (mudzimwapanashe123@gmail.com)</span>
-              </div>
-            )}
+            <button
+              onClick={() => setIsAddingProject(!isAddingProject)}
+              className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-black py-1.5 px-3 rounded-lg font-bold text-xs cursor-pointer text-left select-none"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[3px]" />
+              {isAddingProject ? "Close Builder Panel" : "Create New Project Node"}
+            </button>
           </div>
 
           {/* Hidden Add Project Modal / Box */}
           {isAddingProject && (
-            <form onSubmit={handleAddNewProjectSubmit} className={`p-5 rounded-2xl border ${theme.cardInner} space-y-4 text-xs font-mono`}>
+            <form onSubmit={handleAddNewProjectSubmit} className={`p-5 rounded-2xl border ${theme.cardInner} space-y-4 text-xs font-mono animate-fade-in`}>
               <h4 className="text-xs uppercase font-extrabold text-emerald-400 border-b border-slate-900 pb-1.5">
                 Core Project Registry Form
               </h4>
@@ -824,9 +818,9 @@ export default function AdminDashboard({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2 bg-emerald-500 hover:bg-emerald-450 text-black font-extrabold rounded-lg font-mono text-xs uppercase cursor-pointer"
+                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold rounded-lg font-mono text-xs uppercase cursor-pointer transition disabled:opacity-60"
               >
-                {loading ? "Registering and compiling portfolio..." : "Submit New Compilation Sandbox to Ledger DB"}
+                {loading ? "⏳ Saving project..." : "✓ Submit New Project to Ledger DB"}
               </button>
             </form>
           )}
@@ -1021,6 +1015,106 @@ export default function AdminDashboard({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* SITE CONTENT EDITOR TAB */}
+      {adminTab === "content" && (
+        <div className="space-y-6 animate-fade-in text-left">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[10px] uppercase text-slate-500 font-bold font-mono block">Edit Public-Facing Page Content</span>
+              <p className={`text-xs ${theme.textMuted} mt-0.5`}>Changes save to the database and update About Us &amp; Services pages.</p>
+            </div>
+            <button
+              onClick={handleSaveContent}
+              disabled={contentLoading}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs py-2 px-4 rounded-lg font-mono uppercase cursor-pointer transition disabled:opacity-60"
+            >
+              {contentLoading ? "Saving..." : "✓ Save All Changes"}
+            </button>
+          </div>
+
+          <div className={`p-5 rounded-2xl border ${theme.cardInner} space-y-5`}>
+            <h4 className="text-xs font-extrabold text-cyan-400 uppercase font-mono border-b border-slate-800 pb-2">📄 About Us Page</h4>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold font-mono uppercase text-slate-400">Company Description</label>
+              <textarea
+                rows={4}
+                value={siteContent.aboutCompany}
+                onChange={e => setSiteContent(prev => ({ ...prev, aboutCompany: e.target.value }))}
+                className={`w-full rounded-lg p-3 border outline-none resize-none text-xs font-sans leading-relaxed ${theme.input} focus:ring-1 focus:ring-cyan-500`}
+                placeholder="Company overview shown at the top of the About page..."
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold font-mono uppercase text-slate-400">Founder Story</label>
+              <textarea
+                rows={5}
+                value={siteContent.aboutFounder}
+                onChange={e => setSiteContent(prev => ({ ...prev, aboutFounder: e.target.value }))}
+                className={`w-full rounded-lg p-3 border outline-none resize-none text-xs font-sans leading-relaxed ${theme.input} focus:ring-1 focus:ring-cyan-500`}
+                placeholder="Founder background story shown on the About page..."
+              />
+            </div>
+          </div>
+
+          <div className={`p-5 rounded-2xl border ${theme.cardInner} space-y-5`}>
+            <h4 className="text-xs font-extrabold text-purple-400 uppercase font-mono border-b border-slate-800 pb-2">⚙️ Services Page</h4>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold font-mono uppercase text-slate-400">Services Tagline / Description</label>
+              <textarea
+                rows={3}
+                value={siteContent.servicesTagline}
+                onChange={e => setSiteContent(prev => ({ ...prev, servicesTagline: e.target.value }))}
+                className={`w-full rounded-lg p-3 border outline-none resize-none text-xs font-sans leading-relaxed ${theme.input} focus:ring-1 focus:ring-purple-500`}
+                placeholder="Main description shown at the top of the Services page..."
+              />
+            </div>
+          </div>
+
+          <div className={`p-5 rounded-2xl border ${theme.cardInner} space-y-5`}>
+            <h4 className="text-xs font-extrabold text-amber-400 uppercase font-mono border-b border-slate-800 pb-2">📞 Contact Information</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold font-mono uppercase text-slate-400">Email Address</label>
+                <input
+                  type="email"
+                  value={siteContent.contactEmail}
+                  onChange={e => setSiteContent(prev => ({ ...prev, contactEmail: e.target.value }))}
+                  className={`w-full rounded-lg p-2.5 border outline-none text-xs ${theme.input} focus:ring-1 focus:ring-amber-500`}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold font-mono uppercase text-slate-400">Phone / WhatsApp</label>
+                <input
+                  type="text"
+                  value={siteContent.contactPhone}
+                  onChange={e => setSiteContent(prev => ({ ...prev, contactPhone: e.target.value }))}
+                  className={`w-full rounded-lg p-2.5 border outline-none text-xs ${theme.input} focus:ring-1 focus:ring-amber-500`}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold font-mono uppercase text-slate-400">Office Location</label>
+                <input
+                  type="text"
+                  value={siteContent.companyLocation}
+                  onChange={e => setSiteContent(prev => ({ ...prev, companyLocation: e.target.value }))}
+                  className={`w-full rounded-lg p-2.5 border outline-none text-xs ${theme.input} focus:ring-1 focus:ring-amber-500`}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={handleSaveContent}
+              disabled={contentLoading}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs py-2.5 px-6 rounded-lg font-mono uppercase cursor-pointer transition disabled:opacity-60"
+            >
+              {contentLoading ? "Saving..." : "✓ Save All Site Content"}
+            </button>
+          </div>
         </div>
       )}
 

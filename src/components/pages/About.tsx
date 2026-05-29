@@ -8,9 +8,17 @@ interface AboutProps {
   isDark: boolean;
   theme: any;
   setActiveTab: (tab: any) => void;
+  siteContent?: {
+    aboutCompany: string;
+    aboutFounder: string;
+    servicesTagline: string;
+    contactEmail: string;
+    contactPhone: string;
+    companyLocation: string;
+  };
 }
 
-export default function About({ isDark, theme, setActiveTab }: AboutProps) {
+export default function About({ isDark, theme, setActiveTab, siteContent }: AboutProps) {
   const skills = [
     { name: "Mobile App Development", level: 90, color: "bg-emerald-500" },
     { name: "Web Development", level: 88, color: "bg-cyan-500" },
@@ -69,7 +77,7 @@ export default function About({ isDark, theme, setActiveTab }: AboutProps) {
         </div>
         <div className="mt-6 space-y-4 max-w-3xl">
           <p className={`${theme.textMuted} text-sm leading-relaxed font-sans`}>
-            PanaDev Apps is a growing Zimbabwean technology company focused on building modern, secure, and scalable digital solutions. We create software that helps businesses, organizations, and individuals work smarter through mobile apps, websites, AI systems, and custom software. Our goal is to develop high-quality digital products that close the technology gap between Africa and the rest of the world.
+            {siteContent?.aboutCompany || "PanaDev Apps is a growing Zimbabwean technology company focused on building modern, secure, and scalable digital solutions. We create software that helps businesses, organizations, and individuals work smarter through mobile apps, websites, AI systems, and custom software. Our goal is to develop high-quality digital products that close the technology gap between Africa and the rest of the world."}
           </p>
           <p className={`${theme.textMuted} text-sm leading-relaxed font-sans`}>
             Founded in 2026 by Panashe Mudzimwa, PanaDev Apps represents a new generation of African innovators. We believe Africa has talented developers who deserve global recognition. Our mission is to build strong local technology solutions, uplift digital skills, and create opportunities for future engineers across Zimbabwe and Africa.
@@ -105,7 +113,7 @@ export default function About({ isDark, theme, setActiveTab }: AboutProps) {
             </h3>
             <div className={`p-6 rounded-2xl border ${theme.cardInner} space-y-4 font-sans text-sm leading-relaxed ${theme.textMuted}`}>
               <p>
-                My name is Panashe Mudzimwa, and I was born in Chipinge, Manicaland Province, Zimbabwe. My passion for technology started early. In 2020, while I was still in O-Level, I first interacted with computers and immediately became interested in how software works. After completing Form 4 in 2022, I began teaching myself Android development.
+                {siteContent?.aboutFounder || "My name is Panashe Mudzimwa, and I was born in Chipinge, Manicaland Province, Zimbabwe. My passion for technology started early. In 2020, while I was still in O-Level, I first interacted with computers and immediately became interested in how software works. After completing Form 4 in 2022, I began teaching myself Android development."}
               </p>
               <p>
                 My journey was not easy. I had limited resources, an unreliable computer, and no one to guide me. I learned through online lessons, practice, and rebuilding projects many times. Some projects failed six or seven times before working properly. But every failure taught me something. <strong className="text-emerald-500 font-semibold">I learned to never give up — you can change your methods, but never your goals.</strong>
@@ -145,7 +153,7 @@ export default function About({ isDark, theme, setActiveTab }: AboutProps) {
               </div>
               <div className="flex items-center gap-2 text-slate-500 font-sans text-xs pt-2">
                 <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
-                <span>Chipinge / Harare, Zimbabwe</span>
+                <span>{siteContent?.companyLocation || "Chipinge / Harare, Zimbabwe"}</span>
               </div>
             </div>
           </div>
