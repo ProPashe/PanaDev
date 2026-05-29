@@ -547,44 +547,7 @@ export default function ClientHub({
     }
   };
 
-  // Non-authorized gate
-  if (!user) {
-    return (
-      <div className={`p-8 md:p-12 text-center rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-900' : 'bg-white border-slate-200'} shadow-xl max-w-2xl mx-auto space-y-6 animate-fade-in`}>
-        <div className="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mx-auto border border-amber-500/10">
-          <Key className="w-8 h-8 animate-pulse" />
-        </div>
-        <div className="space-y-2">
-          <h3 className={`text-xl font-bold font-sans ${theme.textHeading}`}>{t("loginFirst")}</h3>
-          <p className={`${theme.textMuted} text-xs font-sans max-w-md mx-auto`}>
-            Track system milestone stages, write internal co-working chats, authorize digital proposals, and review AI audit reports securely on your profile workspace.
-          </p>
-        </div>
 
-        {/* Dynamic Multi-Language Picker */}
-        <div className="flex justify-center gap-1 pb-2 font-mono text-[10px] text-slate-500 select-none">
-          <Languages className="w-3.5 h-3.5 mr-1" />
-          <button onClick={() => setLang("en")} className={`px-2 py-0.5 rounded ${lang === "en" ? "bg-emerald-500 text-black font-extrabold" : "hover:text-white"}`}>ENGLISH</button>
-          <span>|</span>
-          <button onClick={() => setLang("sn")} className={`px-2 py-0.5 rounded ${lang === "sn" ? "bg-emerald-500 text-black font-extrabold" : "hover:text-white"}`}>SHONA</button>
-          <span>|</span>
-          <button onClick={() => setLang("nd")} className={`px-2 py-0.5 rounded ${lang === "nd" ? "bg-emerald-500 text-black font-extrabold" : "hover:text-white"}`}>NDEBELE</button>
-          <span>|</span>
-          <button onClick={() => setLang("fr")} className={`px-2 py-0.5 rounded ${lang === "fr" ? "bg-emerald-500 text-black font-extrabold" : "hover:text-white"}`}>FRENCH</button>
-          <span>|</span>
-          <button onClick={() => setLang("pt")} className={`px-2 py-0.5 rounded ${lang === "pt" ? "bg-emerald-500 text-black font-extrabold" : "hover:text-white"}`}>PORTUGUESE</button>
-        </div>
-
-        <button 
-          onClick={() => setIsSignInModalOpen(true)}
-          className="bg-emerald-500 hover:bg-emerald-450 text-black text-xs font-bold font-sans py-3 px-6 rounded-xl shadow shadow-emerald-500/10 cursor-pointer flex items-center gap-2 mx-auto transition"
-        >
-          <UserCheck className="w-4 h-4 text-black" />
-          <span>{t("signInBtn")}</span>
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8 animate-fade-in text-left">
@@ -592,10 +555,16 @@ export default function ClientHub({
       {/* Header Info Panel */}
       <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${isDark ? 'bg-slate-950/40 border-slate-900' : 'bg-slate-50 border-slate-200'}`}>
         <div className="flex items-center gap-3">
-          <img src={user.avatarUrl} alt="" className="w-10 h-10 rounded-full border border-emerald-500 shrink-0" referrerPolicy="no-referrer" />
+          {user?.avatarUrl ? (
+            <img src={user.avatarUrl} alt="" className="w-10 h-10 rounded-full border border-emerald-500 shrink-0" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-10 h-10 rounded-full border border-emerald-500 shrink-0 bg-slate-800 flex items-center justify-center">
+              <UserCheck className="w-5 h-5 text-emerald-500" />
+            </div>
+          )}
           <div>
             <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wide">💼 Client Collaboration Console</span>
-            <h3 className={`text-base font-extrabold ${theme.textHeading}`}>{t("welcomeBack")}, {user.name}</h3>
+            <h3 className={`text-base font-extrabold ${theme.textHeading}`}>{t("welcomeBack")}{user?.name ? `, ${user.name}` : ''}</h3>
           </div>
         </div>
 

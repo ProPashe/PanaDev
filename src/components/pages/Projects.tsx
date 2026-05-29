@@ -242,21 +242,7 @@ export default function Projects({
 
             {/* Submission Form Right */}
             <div className={`lg:col-span-5 border rounded-2xl p-5 ${theme.card} relative overflow-hidden`}>
-              {!user && (
-                <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center z-20 select-none">
-                  <Play className="w-8 h-8 text-emerald-500 mb-2 animate-pulse" />
-                  <h4 className="text-white font-bold text-xs uppercase font-mono tracking-widest">Sign In to Leave a Review</h4>
-                  <p className="text-[10px] text-zinc-400 max-w-[210px] mt-1.5 mb-3 leading-normal font-sans">
-                    Sign in with your Google account to leave a review.
-                  </p>
-                  <button
-                    onClick={() => setIsSignInModalOpen(true)}
-                    className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-450 text-black py-2 px-3 rounded-lg font-bold text-[10px] shadow-md transition cursor-pointer"
-                  >
-                    <span>Sign In</span>
-                  </button>
-                </div>
-              )}
+
 
               <form onSubmit={handleFeedbackSubmit} className="space-y-4 text-xs font-mono">
                 <h4 className={`text-xs uppercase font-bold border-b pb-1.5 ${isDark ? 'text-emerald-400 border-slate-900' : 'text-emerald-700 border-slate-200'}`}>
@@ -268,20 +254,20 @@ export default function Projects({
                     <label className="block text-[10px] text-slate-505 mb-1 font-bold">CLIENT NAME</label>
                     <input 
                       type="text" 
-                      disabled 
-                      placeholder="Sign In First" 
+                      placeholder="Your Name" 
                       value={feedbackForm.clientName}
-                      className={`w-full rounded p-1.5 border ${theme.input} disabled:opacity-80 text-center font-bold`}
+                      onChange={(e) => setFeedbackForm({ ...feedbackForm, clientName: e.target.value })}
+                      className={`w-full rounded p-1.5 border ${theme.input} text-center font-bold focus:ring-1 focus:ring-emerald-500`}
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] text-slate-505 mb-1 font-bold">CLIENT EMAIL</label>
                     <input 
                       type="email" 
-                      disabled 
-                      placeholder="Sign In First" 
+                      placeholder="Your Email" 
                       value={feedbackForm.clientEmail}
-                      className={`w-full rounded p-1.5 border ${theme.input} disabled:opacity-80 text-center font-bold`}
+                      onChange={(e) => setFeedbackForm({ ...feedbackForm, clientEmail: e.target.value })}
+                      className={`w-full rounded p-1.5 border ${theme.input} text-center font-bold focus:ring-1 focus:ring-emerald-500`}
                     />
                   </div>
                 </div>

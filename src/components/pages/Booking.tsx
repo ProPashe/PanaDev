@@ -152,23 +152,7 @@ export default function Bookings({
 
         {/* Right column form */}
         <div className={`xl:col-span-7 border ${theme.card} rounded-3xl p-6 md:p-8 relative overflow-hidden bg-[#0c1220]/5`}>
-          {/* Sign In lock indicator */}
-          {!user && (
-            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center z-10 select-none">
-              <Lock className="w-8 h-8 text-amber-500 mb-2 animate-bounce" />
-              <h4 className="text-white font-bold text-xs uppercase font-mono tracking-widest">Authentication Required</h4>
-              <p className="text-[10px] text-zinc-400 max-w-[210px] mt-1.5 mb-4 leading-normal font-sans">
-                Please sign in with your Google account to book a consultation slot.
-              </p>
-              <button
-                onClick={() => setIsSignInModalOpen(true)}
-                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-450 text-black py-2.5 px-4 rounded-lg font-bold text-xs shadow-md transition cursor-pointer"
-              >
-                <GoogleIcon />
-                <span>Sign In with Google</span>
-              </button>
-            </div>
-          )}
+
 
           <form onSubmit={handleBookingSubmit} className="space-y-5">
             <h4 className={`text-xs uppercase font-mono tracking-wider font-bold border-b pb-2 mb-2 text-left ${
@@ -183,10 +167,10 @@ export default function Bookings({
                 <input 
                   type="text"
                   required
-                  disabled
                   placeholder="Liam Vance"
                   value={bookingForm.clientName}
-                  className={`w-full rounded px-2.5 py-2 text-xs font-sans outline-none ${theme.input} border disabled:opacity-85 font-semibold text-center`}
+                  onChange={(e) => setBookingForm({ ...bookingForm, clientName: e.target.value })}
+                  className={`w-full rounded px-2.5 py-2 text-xs font-sans outline-none ${theme.input} border focus:ring-1 focus:ring-cyan-500`}
                 />
               </div>
 
@@ -195,10 +179,10 @@ export default function Bookings({
                 <input 
                   type="email"
                   required
-                  disabled
                   placeholder="liam@vance.net"
                   value={bookingForm.clientEmail}
-                  className={`w-full rounded px-2.5 py-2 text-xs font-sans outline-none ${theme.input} border disabled:opacity-85 font-semibold text-center`}
+                  onChange={(e) => setBookingForm({ ...bookingForm, clientEmail: e.target.value })}
+                  className={`w-full rounded px-2.5 py-2 text-xs font-sans outline-none ${theme.input} border focus:ring-1 focus:ring-cyan-500`}
                 />
               </div>
             </div>

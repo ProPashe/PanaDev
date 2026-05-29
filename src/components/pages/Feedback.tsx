@@ -121,9 +121,9 @@ export default function FeedbackPage({
         {/* Explainer CTA Right (3 cols) */}
         <div className="md:col-span-3 text-center space-y-2.5">
           <HelpCircle className="w-7 h-7 text-cyan-400 mx-auto animate-pulse" />
-          <h4 className={`font-bold font-sans text-xs ${theme.textHeading}`}>Every Review is Verified</h4>
+          <h4 className={`font-bold font-sans text-xs ${theme.textHeading}`}>Share Your Experience</h4>
           <p className={`${theme.textMuted} text-[10px] leading-relaxed max-w-xs mx-auto`}>
-            All reviews require a Google sign-in, ensuring every review is from a real person.
+            We value your feedback. Leave a review to let us know how we did on your project.
           </p>
         </div>
 
@@ -188,22 +188,7 @@ export default function FeedbackPage({
         {/* Forms Submission Right (5 cols) */}
         <div className={`xl:col-span-5 border rounded-3xl p-6 md:p-8 relative overflow-hidden bg-[#0c1220]/5 ${theme.card}`}>
           {/* Sign in validation overlay */}
-          {!user && (
-            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center z-10 select-none">
-              <Lock className="w-8 h-8 text-amber-500 mb-2 animate-bounce" />
-              <h4 className="text-white font-bold text-xs uppercase font-mono tracking-widest">Sign In to Leave a Review</h4>
-              <p className="text-[10px] text-zinc-400 max-w-[210px] mt-1.5 mb-4 leading-normal font-sans">
-                Please sign in with your Google account to submit a review.
-              </p>
-              <button
-                onClick={() => setIsSignInModalOpen(true)}
-                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-450 text-black py-2.5 px-4 rounded-lg font-bold text-xs shadow-md transition cursor-pointer"
-              >
-                <GoogleIcon />
-                <span>Sign In with Google</span>
-              </button>
-            </div>
-          )}
+
 
           <form onSubmit={handleFeedbackSubmit} className="space-y-4 text-xs font-mono">
             <h4 className={`text-xs uppercase font-mono tracking-wider font-extrabold border-b pb-1.5 mb-2 text-left ${
@@ -217,10 +202,10 @@ export default function FeedbackPage({
               <input 
                 type="text"
                 required
-                disabled
-                placeholder="User node name"
+                placeholder="Your Name"
                 value={feedbackForm.clientName}
-                className={`w-full rounded p-2 text-xs font-sans outline-none ${theme.input} border disabled:opacity-85 font-semibold text-center`}
+                onChange={(e) => setFeedbackForm({ ...feedbackForm, clientName: e.target.value })}
+                className={`w-full rounded p-2 text-xs font-sans outline-none ${theme.input} border focus:ring-1 focus:ring-emerald-500 font-semibold text-center`}
               />
             </div>
 
@@ -229,10 +214,10 @@ export default function FeedbackPage({
               <input 
                 type="email"
                 required
-                disabled
-                placeholder="Client endpoint address"
+                placeholder="Your Email"
                 value={feedbackForm.clientEmail}
-                className={`w-full rounded p-2 text-xs font-sans outline-none ${theme.input} border disabled:opacity-85 font-semibold text-center`}
+                onChange={(e) => setFeedbackForm({ ...feedbackForm, clientEmail: e.target.value })}
+                className={`w-full rounded p-2 text-xs font-sans outline-none ${theme.input} border focus:ring-1 focus:ring-emerald-500 font-semibold text-center`}
               />
             </div>
 
