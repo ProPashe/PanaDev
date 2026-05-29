@@ -448,6 +448,10 @@ app.post("/api/bookings", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("bookings").add(newBooking);
     (newBooking as any).id = docRef.id;
+  } else {
+    const bkId = `b-${Math.random().toString(36).substring(2, 9)}`;
+    (newBooking as any).id = bkId;
+    await writeToLocalDb("bookings", newBooking, bkId);
   }
 
   sendNotification(
@@ -462,7 +466,7 @@ app.post("/api/bookings", formLimiter, async (req, res) => {
        <tr><td style="padding:6px 12px;font-weight:bold;vertical-align:top">Details</td><td style="padding:6px 12px">${description}</td></tr>
      </table>`
   );
-  res.status(201).json(newBooking);
+  res.status(201).json({ success: true, booking: newBooking });
 });
 
 // Client Reviews Add (Support BOTH endpoints)
@@ -484,6 +488,10 @@ app.post("/api/feedback", formLimiter, async (req, res) => {
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("feedbacks").add(newFeedback);
     (newFeedback as any).id = docRef.id;
+  } else {
+    const fbId = `f-${Math.random().toString(36).substring(2, 9)}`;
+    (newFeedback as any).id = fbId;
+    await writeToLocalDb("feedbacks", newFeedback, fbId);
   }
 
   res.status(201).json({ success: true, feedback: newFeedback });
