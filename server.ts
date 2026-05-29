@@ -139,34 +139,20 @@ function verifyToken(token: string): any {
 }
 
 // ─── Admin Auth Middleware ────────────────────────────────────────────────────
-const ADMIN_UID = process.env.ADMIN_UID || "";
-
 async function verifyAdmin(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Unauthorized: No token provided." });
   }
-  const idToken = authHeader.split("Bearer ")[1];
+  const token = authHeader.split("Bearer ")[1];
 
-  // Try custom JWT token validation first
-  const customUser = verifyToken(idToken);
-  if (customUser) {
-    req.adminUser = customUser;
-    return next();
+  const customUser = verifyToken(token);
+  if (!customUser) {
+    return res.status(401).json({ error: "Unauthorized: Invalid or expired token." });
   }
 
-  try {
-    const decoded = await admin.auth().verifyIdToken(idToken);
-    // Allow if UID matches admin OR email matches admin email
-    if (decoded.uid !== ADMIN_UID && decoded.email !== "mudzimwapanashe123@gmail.com") {
-      return res.status(403).json({ error: "Forbidden: Admin access only." });
-    }
-    req.adminUser = decoded;
-    next();
-  } catch (err: any) {
-    console.error("verifyAdmin Error:", err);
-    return res.status(401).json({ error: `Unauthorized: ${err.message}` });
-  }
+  req.adminUser = customUser;
+  next();
 }
 
 // Initialize Gemini API Client lazily
@@ -197,6 +183,32 @@ async function fetchCollection(colName: string) {
   const snapshot = await dbFirestore.collection(colName).get();
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
+
+app.post("/api/admin-login", formLimiter, async (req, res) => {
+  const { password } = req.body;
+  if (!password || typeof password !== "string") {
+    return res.status(400).json({ error: "Password required." });
+  }
+
+  const expectedPassword = process.env.ADMIN_PASSWORD;
+  if (!expectedPassword) {
+    return res.status(500).json({ error: "Admin login is not configured." });
+  }
+
+  if (password !== expectedPassword) {
+    return res.status(401).json({ error: "Invalid credentials." });
+  }
+
+  const token = signToken({ role: "admin", email: "mudzimwapanashe123@gmail.com", name: "Panashe Mudzimwa (Admin)" });
+  res.json({
+    success: true,
+    token,
+    user: {
+      name: "Panashe Mudzimwa (Admin)",
+      email: "mudzimwapanashe123@gmail.com"
+    }
+  });
+});
 
 app.get("/api/data", verifyAdmin, async (req, res) => {
   const [bookings, feedbacks, sponsorships] = await Promise.all([
