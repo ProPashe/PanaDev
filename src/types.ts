@@ -60,6 +60,8 @@ export interface SponsorshipRequest {
   fundingAmount: number;
   durationMonths: number;
   tier: 'Bronze' | 'Silver' | 'Gold' | 'Elite';
+  status?: 'Pending' | 'Accepted' | 'Refused' | 'Recorded';
+  recordedAt?: string;
   message?: string;
   createdAt: string;
 }
@@ -73,5 +75,7 @@ export interface Sponsorship {
   amount: number;
   website?: string;
   message?: string;
+  status?: 'Pending' | 'Accepted' | 'Refused' | 'Recorded';
+  recordedAt?: string;
   createdAt: string;
 }

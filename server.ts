@@ -130,63 +130,75 @@ function hashPassword(password: string): string {
   return crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
 }
 
-async function writeToLocalDb(colName: string, item: any, id?: string) {
+const ALLOWED_COLLECTIONS = new Set(["projects", "feedbacks", "bookings", "sponsorships", "contacts", "siteContent"]);
+
+function sanitizeCollectionName(colName: string) {
+  if (!ALLOWED_COLLECTIONS.has(colName)) {
+    throw new Error(`Unsupported collection: ${colName}`);
+  }
+  return colName;
+}
+
+function readDbJson() {
   const dbPath = path.join(process.cwd(), "db.json");
-  if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify({}, null, 2), "utf8");
-  }
+  if (!fs.existsSync(dbPath)) return {};
   try {
-    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
-    if (!data[colName]) {
-      data[colName] = [];
-    }
-    if (id) {
-      const idx = data[colName].findIndex((x: any) => x.id === id);
-      if (idx !== -1) {
-        data[colName][idx] = { ...data[colName][idx], ...item, id };
-      } else {
-        data[colName].push({ ...item, id });
-      }
-    } else {
-      data[colName].push(item);
-    }
-    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+    const raw = fs.readFileSync(dbPath, "utf8");
+    if (!raw) return {};
+    return JSON.parse(raw);
   } catch (err) {
-    console.error(`Error writing to local db.json for ${colName}:`, err);
-    throw err;
+    console.error("Error reading db.json:", err);
+    return {};
   }
+}
+
+function writeDbJson(data: any) {
+  const dbPath = path.join(process.cwd(), "db.json");
+  const tempPath = `${dbPath}.tmp`;
+  try {
+    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), "utf8");
+    fs.renameSync(tempPath, dbPath);
+  } catch (err) {
+    console.error("Failed to write db.json atomically:", err);
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+  }
+}
+
+async function writeToLocalDb(colName: string, item: any, id?: string) {
+  colName = sanitizeCollectionName(colName);
+  const data = readDbJson();
+  if (!Array.isArray(data[colName])) {
+    data[colName] = [];
+  }
+  if (id) {
+    const idx = data[colName].findIndex((x: any) => x.id === id);
+    if (idx !== -1) {
+      data[colName][idx] = { ...data[colName][idx], ...item, id };
+    } else {
+      data[colName].push({ ...item, id });
+    }
+  } else {
+    data[colName].push(item);
+  }
+  writeDbJson(data);
 }
 
 async function deleteFromLocalDb(colName: string, id: string) {
-  const dbPath = path.join(process.cwd(), "db.json");
-  if (!fs.existsSync(dbPath)) return;
-  try {
-    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
-    if (data[colName]) {
-      data[colName] = data[colName].filter((x: any) => x.id !== id);
-      fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
-    }
-  } catch (err) {
-    console.error(`Error deleting from local db.json for ${colName}:`, err);
-    throw err;
-  }
+  colName = sanitizeCollectionName(colName);
+  const data = readDbJson();
+  if (!Array.isArray(data[colName])) return;
+  data[colName] = data[colName].filter((x: any) => x.id !== id);
+  writeDbJson(data);
 }
 
-async function updateLocalDbStatus(colName: string, id: string, status: string) {
-  const dbPath = path.join(process.cwd(), "db.json");
-  if (!fs.existsSync(dbPath)) return;
-  try {
-    const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
-    if (data[colName]) {
-      const idx = data[colName].findIndex((x: any) => x.id === id);
-      if (idx !== -1) {
-        data[colName][idx].status = status;
-        fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
-      }
-    }
-  } catch (err) {
-    console.error(`Error updating local db.json for ${colName}:`, err);
-    throw err;
+async function updateLocalDbStatus(colName: string, id: string, payload: Record<string, any>) {
+  colName = sanitizeCollectionName(colName);
+  const data = readDbJson();
+  if (!Array.isArray(data[colName])) return;
+  const idx = data[colName].findIndex((x: any) => x.id === id);
+  if (idx !== -1) {
+    data[colName][idx] = { ...data[colName][idx], ...payload, id };
+    writeDbJson(data);
   }
 }
 
@@ -274,15 +286,11 @@ function getGeminiClient(): GoogleGenAI {
 
 // Helper to fetch collection
 async function fetchCollection(colName: string) {
+  sanitizeCollectionName(colName);
   if (!dbFirestore) {
-    const dbPath = path.join(process.cwd(), "db.json");
-    if (fs.existsSync(dbPath)) {
-      try {
-        const data = JSON.parse(fs.readFileSync(dbPath, "utf8"));
-        return data[colName] || [];
-      } catch (err) {
-        console.error(`Error reading ${colName} from db.json fallback:`, err);
-      }
+    const data = readDbJson();
+    if (Array.isArray(data[colName])) {
+      return data[colName];
     }
     return [];
   }
@@ -297,8 +305,14 @@ app.post("/api/admin-login", formLimiter, async (req, res) => {
   }
 
   const expectedEmail = process.env.ADMIN_EMAIL || "mudzimwapanashe123@gmail.com";
-  const expectedPassword = process.env.ADMIN_PASSWORD;
+  let expectedPassword = process.env.ADMIN_PASSWORD;
   const expectedPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+
+  const isDevFallback = !expectedPassword && !expectedPasswordHash && process.env.NODE_ENV !== "production";
+  if (isDevFallback) {
+    expectedPassword = "@panashe2004";
+    console.warn("Admin login fallback enabled for local development. Set ADMIN_PASSWORD or ADMIN_PASSWORD_HASH in production.");
+  }
 
   if (email.toLowerCase() !== expectedEmail.toLowerCase()) {
     return res.status(401).json({ error: "Invalid credentials." });
@@ -632,12 +646,19 @@ app.post("/api/sponsorships", formLimiter, async (req, res) => {
     amount: amountToUse ? parseInt(amountToUse, 10) : 0,
     website: website || "",
     message: message || "",
+    durationMonths: req.body.durationMonths ? parseInt(req.body.durationMonths, 10) : undefined,
+    tier: req.body.tier || undefined,
+    status: "Pending",
     createdAt: new Date().toISOString()
   };
 
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("sponsorships").add(newSponsor);
     (newSponsor as any).id = docRef.id;
+  } else {
+    const sponsorId = `s-${Math.random().toString(36).substring(2, 9)}`;
+    (newSponsor as any).id = sponsorId;
+    await writeToLocalDb("sponsorships", newSponsor, sponsorId);
   }
 
   sendNotification(
@@ -654,6 +675,39 @@ app.post("/api/sponsorships", formLimiter, async (req, res) => {
      </table>`
   );
   res.status(201).json(newSponsor);
+});
+
+// Sponsorship status update (admin only)
+app.put("/api/sponsorships/:id", verifyAdmin, async (req, res) => {
+  const { status } = req.body;
+  const allowedStatuses = ["Pending", "Accepted", "Refused", "Recorded"];
+  if (!status || !allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: "Invalid sponsorship status" });
+  }
+
+  const updatePayload: any = { status };
+  if (status === "Recorded") {
+    updatePayload.recordedAt = new Date().toISOString();
+  }
+
+  if (!dbFirestore) {
+    try {
+      await updateLocalDbStatus("sponsorships", req.params.id, updatePayload);
+      const stored = (await fetchCollection("sponsorships")).find((item: any) => item.id === req.params.id);
+      return res.json({ success: true, sponsorship: stored });
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to update sponsorship status locally" });
+    }
+  }
+
+  try {
+    const docRef = dbFirestore.collection("sponsorships").doc(req.params.id);
+    await docRef.update(updatePayload);
+    const updatedDoc = await docRef.get();
+    return res.json({ success: true, sponsorship: { id: updatedDoc.id, ...(updatedDoc.data() || {}) } });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update sponsorship status" });
+  }
 });
 
 // Contacts GET (admin only)
@@ -973,7 +1027,7 @@ app.delete("/api/feedback/:id", verifyAdmin, async (req, res) => {
 app.put("/api/bookings/:id", verifyAdmin, async (req, res) => {
   if (!dbFirestore) {
     try {
-      await updateLocalDbStatus("bookings", req.params.id, req.body.status);
+      await updateLocalDbStatus("bookings", req.params.id, { status: req.body.status });
       return res.json({ success: true });
     } catch (err) {
       return res.status(500).json({ error: "Failed to update booking status locally" });

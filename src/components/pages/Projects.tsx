@@ -77,21 +77,9 @@ export default function Projects({
   };
 
   const getProblemSolved = (proj: Project) => {
-    if (proj.id === "tasksync") {
-      return {
-        issue: "Modern business and project teams require a simple, unified, and fast way to align on daily goals and track priorities without the overhead of heavy and expensive enterprise tracking software.",
-        architecture: "High-performance interactive board featuring smooth drag animations, customizable stages, and instant local and cloud database loading."
-      };
-    }
-    if (proj.id === "pixelcraft") {
-      return {
-        issue: "Creative specialists and web teams often face complex, bloated offline design software when trying to quickly build, scale, and export lightweight custom vector assets or SVG graphics for their web builds.",
-        architecture: "Automated vector design canvas rendering lightweight SVG shapes, custom dimensions, and instant high-fidelity code generation."
-      };
-    }
     return {
       issue: proj.fullDescription || "Custom operational problem solved by this system.",
-      architecture: proj.tags.join(" • ") || "Bespoke Full-Stack Software Integration"
+      architecture: proj.tags && proj.tags.length ? proj.tags.join(" • ") : "Bespoke Full-Stack Software Integration"
     };
   };
 

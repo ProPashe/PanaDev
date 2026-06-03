@@ -155,7 +155,7 @@ export default function ClientHub({
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || TRANSLATIONS.en[key] || key;
 
   // Track state loaded or defined
-  const [selectedUserProj, setSelectedUserProj] = useState<string>("tasksync-portfolio");
+  const [selectedUserProj, setSelectedUserProj] = useState<string>("");
   const [trackerStep, setTrackerStep] = useState<number>(3); // UI Design, Development, etc
   const [predictionData, setPredictionData] = useState<{
     delayRisk: string;
@@ -659,10 +659,16 @@ export default function ClientHub({
                   }}
                   className={`w-full text-xs font-mono font-bold rounded p-2 outline-none ${theme.input} border focus:ring-1 focus:ring-cyan-500`}
                 >
-                  <option value="tasksync-portfolio">TaskSync Workspace System</option>
-                  <option value="pixelcraft-canvas">PixelCraft coordinates Vector Canvas</option>
-                  <option value="invoica-calculator">Invoica blueprints row calculations</option>
-                  <option value="general-consultation">Active Meeting Consultation Booking</option>
+                  {projects && projects.length > 0 ? (
+                    <>
+                      <option value="">Select a project...</option>
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.id}>{p.title}</option>
+                      ))}
+                    </>
+                  ) : (
+                    <option value="">No projects available — add projects in Admin</option>
+                  )}
                 </select>
               </div>
 
@@ -1139,10 +1145,15 @@ export default function ClientHub({
                   </div>
                   <div>
                     <label className="block text-[10px] uppercase text-slate-500 mb-1 font-bold">Selected Project</label>
-                    <select className={`w-full text-[10px] font-mono rounded p-2 outline-none ${theme.input} border focus:ring-1`}>
-                      <option>All Systems Node</option>
-                      <option>TaskSync Workspace</option>
-                      <option>PixelCraft block</option>
+                    <select className={`w-full text-[10px] font-mono rounded p-2 outline-none ${theme.input} border focus:ring-1`} value={selectedUserProj} onChange={(e)=>setSelectedUserProj(e.target.value)}>
+                      {projects && projects.length > 0 ? (
+                        <>
+                          <option value="">All Systems Node</option>
+                          {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                        </>
+                      ) : (
+                        <option value="">No projects configured</option>
+                      )}
                     </select>
                   </div>
                 </div>

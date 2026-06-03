@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Layers, Grid3X3, Sliders, Users, Calendar, UserCheck, MessageSquare,
@@ -86,17 +86,34 @@ function AppInner() {
   const [idToken, setIdToken] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
+  const pollingRef = useRef<number | null>(null);
 
   const BASE = "";
 
   // Auth-aware API fetch — attaches Bearer token for admin-protected routes
   const apiFetch = async (path: string, init?: RequestInit) => {
-    const authHeaders = idToken ? { Authorization: `Bearer ${idToken}` } : {};
-    return fetch(`${BASE}/api${path}`, {
+    const response = await fetch(`${BASE}/api${path}`, {
       ...init,
       credentials: "include",
-      headers: { "Content-Type": "application/json", ...authHeaders, ...(init?.headers || {}) }
+      headers: { "Content-Type": "application/json", ...(init?.headers || {}) }
     });
+
+    if (!response.ok) {
+      let errorText = response.statusText;
+      try {
+        const body = await response.json();
+        errorText = body?.error || body?.message || JSON.stringify(body);
+      } catch {
+        try {
+          errorText = await response.text();
+        } catch {
+          errorText = response.statusText;
+        }
+      }
+      throw new Error(errorText || `${response.status} ${response.statusText}`);
+    }
+
+    return response;
   };
 
   // Auth initialization: verify session with backend
@@ -110,11 +127,6 @@ function AppInner() {
             setUser(data.user);
             setIdToken(data.token || null);
             localStorage.setItem("panadev_user", JSON.stringify(data.user));
-            if (data.token) {
-              localStorage.setItem("panadev_token", data.token);
-            } else {
-              localStorage.removeItem("panadev_token");
-            }
             return;
           }
         }
@@ -125,7 +137,6 @@ function AppInner() {
       setUser(null);
       setIdToken(null);
       localStorage.removeItem("panadev_user");
-      localStorage.removeItem("panadev_token");
     };
 
     checkAuthSession().finally(() => setAuthChecked(true));
@@ -199,19 +210,35 @@ function AppInner() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
+    const refreshingFetch = async () => {
+      if (!isMounted) return;
+      await fetchPublicData();
+    };
+
     // Initial load
-    fetchPublicData();
+    refreshingFetch();
+
     // Refetch when the window regains focus or becomes visible (helps after sleep)
-    const onVisibility = () => { if (!document.hidden) fetchPublicData(); };
-    const onFocus = () => fetchPublicData();
-    const onOnline = () => fetchPublicData();
+    const onVisibility = () => { if (!document.hidden) refreshingFetch(); };
+    const onFocus = () => refreshingFetch();
+    const onOnline = () => refreshingFetch();
+
     window.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
     window.addEventListener('online', onOnline);
+
+    pollingRef.current = window.setInterval(() => {
+      if (!document.hidden) refreshingFetch();
+    }, 30000);
+
     return () => {
+      isMounted = false;
       window.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('online', onOnline);
+      if (pollingRef.current) window.clearInterval(pollingRef.current);
     };
   }, []);
 
@@ -516,7 +543,6 @@ function AppInner() {
                     setUser(usr);
                     setIdToken(tok);
                     localStorage.setItem("panadev_user", JSON.stringify(usr));
-                    localStorage.setItem("panadev_token", tok);
                     setActiveTab("admin");
                   }} 
                   showToast={showToast} 

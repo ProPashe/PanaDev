@@ -95,6 +95,7 @@ export default function AdminDashboard({
   // State arrays fetched via APIs
   const [sponsorships, setSponsorships] = useState<SponsorshipRequest[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
+  const [sponsorshipActionLoading, setSponsorshipActionLoading] = useState<Record<string, boolean>>({});
   const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
 
   const adminTabs: { id: AdminTab; label: string; count?: number }[] = [
@@ -651,6 +652,33 @@ export default function AdminDashboard({
   const getSponsorshipRepresentative = (sp: any) => sp.sponsorName || sp.name || "Partner";
   const getSponsorshipEmail = (sp: any) => sp.sponsorEmail || sp.email || "N/A";
   const getSponsorshipDuration = (sp: any) => sp.durationMonths ?? 1;
+  const getSponsorshipStatus = (sp: any): string => sp.status ? String(sp.status) : "Pending";
+
+  const handleSponsorshipAction = async (sponsorshipId: string, action: "Accepted" | "Refused" | "Recorded") => {
+    if (!isAuthorized) {
+      showToast("You are not authorized to manage sponsorships.", "error");
+      return;
+    }
+    try {
+      setSponsorshipActionLoading(prev => ({ ...prev, [sponsorshipId]: true }));
+      const res = await apiFetch(`/sponsorships/${sponsorshipId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: action })
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData?.error || "Unable to update sponsorship status.");
+      }
+      const updated = await res.json();
+      setSponsorships((current) => current.map((sp) => sp.id === sponsorshipId ? { ...sp, ...updated.sponsorship } : sp));
+      showToast(`Sponsorship ${action.toLowerCase()} successfully.`, "success");
+    } catch (err: any) {
+      showToast(err.message || "Failed to update sponsorship.", "error");
+    } finally {
+      setSponsorshipActionLoading(prev => ({ ...prev, [sponsorshipId]: false }));
+    }
+  };
 
   const totalFundingCollected = sponsorships.reduce((sum, sp) => sum + getSponsorshipAmount(sp), 0);
 
@@ -1568,9 +1596,50 @@ export default function AdminDashboard({
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-slate-500/5">
-                    <span className="font-bold text-emerald-400 uppercase">PARTNERSHIP REGISTERED // COMPLIED</span>
-                    <span>ticket id: {sp.id}</span>
+                  <div className="flex flex-col gap-3 text-[10px] text-slate-500 pt-2 border-t border-slate-500/5 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${getSponsorshipStatus(sp) === "Accepted" ? "bg-emerald-500/15 text-emerald-300" : getSponsorshipStatus(sp) === "Refused" ? "bg-rose-500/15 text-rose-300" : getSponsorshipStatus(sp) === "Recorded" ? "bg-cyan-500/15 text-cyan-300" : "bg-slate-700/15 text-slate-300"}`}>
+                        {getSponsorshipStatus(sp)}
+                      </span>
+                      {sp.recordedAt && (
+                        <span className="text-[10px] text-slate-400">recorded {new Date(sp.recordedAt).toLocaleDateString()}</span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 justify-end">
+                      {canModifyBookings && getSponsorshipStatus(sp) !== "Recorded" && (
+                        <>
+                          {getSponsorshipStatus(sp) !== "Accepted" && (
+                            <button
+                              disabled={Boolean(sponsorshipActionLoading[sp.id])}
+                              onClick={() => handleSponsorshipAction(sp.id, "Accepted")}
+                              className="px-3 py-2 rounded-lg bg-emerald-500 text-black text-[10px] font-bold uppercase transition hover:bg-emerald-400 disabled:opacity-50"
+                            >
+                              {sponsorshipActionLoading[sp.id] ? "Updating..." : "Accept"}
+                            </button>
+                          )}
+                          {getSponsorshipStatus(sp) !== "Refused" && (
+                            <button
+                              disabled={Boolean(sponsorshipActionLoading[sp.id])}
+                              onClick={() => handleSponsorshipAction(sp.id, "Refused")}
+                              className="px-3 py-2 rounded-lg bg-rose-500 text-white text-[10px] font-bold uppercase transition hover:bg-rose-400 disabled:opacity-50"
+                            >
+                              {sponsorshipActionLoading[sp.id] ? "Updating..." : "Refuse"}
+                            </button>
+                          )}
+                          {getSponsorshipStatus(sp) === "Accepted" && (
+                            <button
+                              disabled={Boolean(sponsorshipActionLoading[sp.id])}
+                              onClick={() => handleSponsorshipAction(sp.id, "Recorded")}
+                              className="px-3 py-2 rounded-lg bg-cyan-500 text-black text-[10px] font-bold uppercase transition hover:bg-cyan-400 disabled:opacity-50"
+                            >
+                              {sponsorshipActionLoading[sp.id] ? "Updating..." : "Record"}
+                            </button>
+                          )}
+                        </>
+                      )}
+                      <span>ticket id: {sp.id}</span>
+                    </div>
                   </div>
                 </div>
               ))}
