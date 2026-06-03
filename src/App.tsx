@@ -80,7 +80,7 @@ function AppInner() {
   const [sponsorLoading, setSponsorLoading] = useState(false);
 
   const [feedbackForm, setFeedbackForm] = useState({ clientName: "", clientEmail: "", rating: 5, comment: "", projectId: "" });
-  const [bookingForm, setBookingForm] = useState({ clientName: "", clientEmail: "", companyName: "", date: new Date().toISOString().split("T")[0], timeSlot: "02:00 PM - 03:00 PM", projectType: "web" as const, description: "", budget: "" });
+  const [bookingForm, setBookingForm] = useState({ clientName: "", clientEmail: "", companyName: "", date: new Date().toISOString().split("T")[0], timeSlot: "02:00 PM - 03:00 PM", projectType: "web" as const, description: "", budget: "", termsAccepted: false });
   const [contactForm, setContactForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [sponsorForm, setSponsorForm] = useState({ sponsorName: "", sponsorEmail: "", phone: "", companyName: "", fundingAmount: 0, website: "", message: "" });
   const [idToken, setIdToken] = useState<string | null>(null);
@@ -250,6 +250,7 @@ function AppInner() {
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bookingForm.clientName || !bookingForm.description) { showToast("Fill in all required fields.", "error"); return; }
+    if (!bookingForm.termsAccepted) { showToast("You must agree to the terms and conditions before submitting.", "error"); return; }
     try {
       setBookingLoading(true);
       const res = await apiFetch("/bookings", { method: "POST", body: JSON.stringify(bookingForm) });
@@ -258,7 +259,7 @@ function AppInner() {
         setBookings(prev => [data.booking, ...prev]);
         const waText = `Hello Panashe! I booked a consultation:\n\nName: ${bookingForm.clientName}\nEmail: ${bookingForm.clientEmail}\nCompany: ${bookingForm.companyName || "N/A"}\nType: ${bookingForm.projectType}\nDate: ${bookingForm.date} @ ${bookingForm.timeSlot}\nBudget: ${bookingForm.budget || "Not specified"}\n\nDetails: "${bookingForm.description}"`;
         setSuccessModalData({ type: "booking", title: "Consultation Booked!", message: `Your appointment on ${bookingForm.date} at ${bookingForm.timeSlot} is confirmed. We will reach out shortly.`, whatsAppUrl: `https://wa.me/263713058383?text=${encodeURIComponent(waText)}`, whatsAppText: "Confirm via WhatsApp" });
-        setBookingForm(b => ({ ...b, companyName: "", description: "", budget: "" }));
+        setBookingForm(b => ({ ...b, companyName: "", description: "", budget: "", termsAccepted: false }));
         showToast("Consultation booked!");
       } else { showToast(data.error || "Error booking.", "error"); }
     } catch { showToast("Something went wrong.", "error"); }

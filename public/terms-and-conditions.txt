@@ -1,0 +1,28 @@
+PRE-CONSULTATION AGREEMENT FORM
+
+Welcome to PanaDev Apps. Before scheduling your consultation via our booking platform, please carefully review and accept the terms and conditions outlined below. This agreement ensures mutual commitment and outlines the financial and operational framework for our initial project alignment.
+
+1. Scope of Consultation
+The consultation session is designed to explore your digital goals, map out system requirements, and provide high-level strategic guidance. This includes, but is not limited to:
+- Initial project architecture brainstorming.
+- Tech stack suitability evaluation (e.g., Web, Mobile, AI integrations).
+- Scope definition and preliminary budgeting analysis.
+
+2. Fees and Billing Structure
+- Hourly Rate: Consultations are billed at a flat rate of $5 USD per hour (or part thereof).
+- Minimum Billing: A minimum charge of one (1) hour ($5 USD) applies to every scheduled session.
+- Payment Terms: Payment for virtual sessions must be settled prior to or immediately following the conclusion of the consultation, as agreed upon by the Technical Director.
+
+3. Meeting Formats & Logistics
+- Virtual Consultations (Google Meet / Zoom): Billed strictly at the hourly rate of $5/hour. A recording of the session can be forwarded to your registered client email upon request.
+- Physical Consultations: If a physical meeting is requested and approved based on location and availability, the client is strictly required to provide or reimburse the full transport fee for the PanaDev representative. This transport fee is separate from, and in addition to, the standard $5/hour consultation rate.
+
+4. Cancellation and Rescheduling
+- We value your time and ask that you value ours. If you need to reschedule or cancel your consultation, you must do so at least 24 hours before the scheduled time slot.
+- Failure to show up for a scheduled physical consultation without prior notice may result in the client being blacklisted from future bookings or being invoiced for the lost travel expenses.
+
+5. Confidentiality & Non-Disclosure
+PanaDev Apps respects your intellectual property. Any business ideas, app concepts, or proprietary data disclosed during this consultation will be kept strictly confidential and will not be shared with third parties.
+
+Acknowledgment & Electronic Signature
+By checking the agreement box on the booking form and clicking "SUBMIT CONSULTATION REQUEST", you legally acknowledge that you have read, understood, and agree to be bound by these terms, specifically confirming your commitment to the $5/hour fee and the transportation coverage requirement for physical meetings.

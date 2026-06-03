@@ -645,7 +645,14 @@ export default function AdminDashboard({
   };
 
   // Analytics helper maps
-  const totalFundingCollected = sponsorships.reduce((sum, sp) => sum + (Number(sp.fundingAmount) || 0), 0);
+  const getSponsorshipAmount = (sp: any) => Number(sp.fundingAmount ?? sp.amount ?? 0);
+  const getSponsorshipTier = (sp: any) => sp.tier || (getSponsorshipAmount(sp) >= 1000 ? "Gold" : getSponsorshipAmount(sp) >= 500 ? "Silver" : "Bronze");
+  const getSponsorshipCompany = (sp: any) => sp.companyName || sp.organization || "Unknown";
+  const getSponsorshipRepresentative = (sp: any) => sp.sponsorName || sp.name || "Partner";
+  const getSponsorshipEmail = (sp: any) => sp.sponsorEmail || sp.email || "N/A";
+  const getSponsorshipDuration = (sp: any) => sp.durationMonths ?? 1;
+
+  const totalFundingCollected = sponsorships.reduce((sum, sp) => sum + getSponsorshipAmount(sp), 0);
 
   const conversionRate = bookings.length > 0 ? Math.min(98, Math.round((bookings.length / Math.max(1, contacts.length + bookings.length)) * 100)) : 0;
   const sponsorActivation = sponsorships.length > 0 ? Math.min(100, Math.round((sponsorships.length / Math.max(1, projects.length)) * 100)) : 0;
@@ -668,9 +675,9 @@ export default function AdminDashboard({
   ];
 
   const sponsorshipTierData = [
-    { name: "Gold", value: sponsorships.filter(sp => sp.tier === "Gold").length, fill: "#f59e0b" },
-    { name: "Silver", value: sponsorships.filter(sp => sp.tier === "Silver").length, fill: "#38bdf8" },
-    { name: "Bronze", value: sponsorships.filter(sp => sp.tier === "Bronze").length, fill: "#a855f7" }
+    { name: "Gold", value: sponsorships.filter(sp => getSponsorshipTier(sp) === "Gold").length, fill: "#f59e0b" },
+    { name: "Silver", value: sponsorships.filter(sp => getSponsorshipTier(sp) === "Silver").length, fill: "#38bdf8" },
+    { name: "Bronze", value: sponsorships.filter(sp => getSponsorshipTier(sp) === "Bronze").length, fill: "#a855f7" }
   ];
 
   const bookingsStatusData = [
@@ -1542,16 +1549,16 @@ export default function AdminDashboard({
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2">
                         <span className="bg-amber-500 text-black px-1.5 py-0.5 rounded text-[10px] font-mono font-black uppercase tracking-wider">
-                          {sp.tier} SPONSOR
+                          {getSponsorshipTier(sp)} SPONSOR
                         </span>
-                        <h4 className={`text-sm font-bold font-sans ${theme.textHeading}`}>{sp.companyName}</h4>
+                        <h4 className={`text-sm font-bold font-sans ${theme.textHeading}`}>{getSponsorshipCompany(sp)}</h4>
                       </div>
-                      <p className={`${theme.textMuted} text-[10px]`}> Representative: {sp.sponsorName} | 📧 {sp.sponsorEmail}</p>
+                      <p className={`${theme.textMuted} text-[10px]`}> Representative: {getSponsorshipRepresentative(sp)} | 📧 {getSponsorshipEmail(sp)}</p>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <p className="text-base font-extrabold text-emerald-400 font-mono">${sp.fundingAmount.toLocaleString()} USD</p>
-                      <span className="text-[10px] text-slate-500 font-mono font-bold uppercase">{sp.durationMonths} Months duration</span>
+                      <p className="text-base font-extrabold text-emerald-400 font-mono">${getSponsorshipAmount(sp).toLocaleString()} USD</p>
+                      <span className="text-[10px] text-slate-500 font-mono font-bold uppercase">{getSponsorshipDuration(sp)} Months duration</span>
                     </div>
                   </div>
 

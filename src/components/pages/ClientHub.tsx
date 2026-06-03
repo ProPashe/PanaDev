@@ -846,7 +846,7 @@ export default function ClientHub({
             <div className={`p-6 rounded-2xl border space-y-3.5 ${theme.cardInner}`}>
               <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/20 px-2 py-0.5 rounded border border-cyan-900/15 uppercase">AI Assistance Enabled</span>
               <p className="text-slate-400 text-[10px] font-sans leading-relaxed">
-                Our Gemini API support agent is ready. Ask details like:
+                Gemini-powered assistant for risk prediction, proposal generation, SEO and site audits. Coming soon — we will fully implement it when we have a functional GEMINI_API_KEY.
                 <br />
                 <span className="text-zinc-300 font-semibold block mt-1 italic">"Suggest best color palettes for an oil & gas company"</span>
               </p>

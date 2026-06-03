@@ -267,10 +267,28 @@ export default function Bookings({
               />
             </div>
 
+            <div className="flex flex-col gap-3 text-[10px] text-slate-400 font-mono">
+              <label className="inline-flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={bookingForm.termsAccepted || false}
+                  onChange={(e) => setBookingForm({ ...bookingForm, termsAccepted: e.target.checked })}
+                  className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500"
+                  required
+                />
+                <span className="leading-tight text-slate-200">
+                  I have read and agree to the <a href="/terms-and-conditions.txt" download target="_blank" rel="noopener noreferrer" className="underline text-cyan-300 hover:text-cyan-200">Terms & Conditions</a>.
+                </span>
+              </label>
+              <p className="text-[10px] text-slate-500">
+                Please download and review the agreement before submitting your consultation request.
+              </p>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="submit"
-                disabled={bookingLoading}
+                disabled={bookingLoading || !bookingForm.termsAccepted}
                 className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold py-3.5 rounded-xl text-xs font-mono uppercase transition cursor-pointer shadow-md shadow-cyan-600/10"
               >
                 {bookingLoading ? "Registering Reservation..." : "Submit Consultation Request"}
@@ -285,7 +303,9 @@ export default function Bookings({
                     date: new Date().toISOString().split("T")[0],
                     timeSlot: "09:00 AM - 10:00 AM",
                     projectType: "web",
-                    description: ""
+                    description: "",
+                    budget: "",
+                    termsAccepted: false
                   });
                   setActiveTab("home");
                 }}
