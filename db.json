@@ -63,6 +63,20 @@
         "users": "900"
       }
     }
+    ,
+    {
+      "id": "test-new-project",
+      "title": "Test New Project",
+      "category": "Testing",
+      "description": "Temporary test entry to validate refresh behavior.",
+      "fullDescription": "This project was added by an automated test to verify that the /api/projects endpoint returns newly added projects after app wake/resume.",
+      "status": "Completed",
+      "tags": ["test", "automation"],
+      "deployedUrl": "#",
+      "githubUrl": "#",
+      "metrics": { "stars": 0 },
+      "createdAt": "2026-06-03T00:00:00.000Z"
+    }
   ],
   "feedbacks": [
     {

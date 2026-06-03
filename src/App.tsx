@@ -179,18 +179,40 @@ function AppInner() {
   }, [user]);
 
   // Fetch public data (projects + feedbacks + site content)
-  useEffect(() => {
-    Promise.all([
-      apiFetch("/projects").then(r => r.json()).catch(() => []),
-      apiFetch("/feedback").then(r => r.json()).catch(() => []),
-      apiFetch("/site-content").then(r => r.json()).catch(() => ({})),
-    ]).then(([p, f, c]) => {
+  const fetchPublicData = async () => {
+    try {
+      const [p, f, c] = await Promise.all([
+        apiFetch("/projects").then(r => r.json()).catch(() => []),
+        apiFetch("/feedback").then(r => r.json()).catch(() => []),
+        apiFetch("/site-content").then(r => r.json()).catch(() => ({})),
+      ]);
       setProjects(Array.isArray(p) ? p : []);
       setFeedbacks(Array.isArray(f) ? f : []);
       if (c && typeof c === "object" && !Array.isArray(c)) {
         setSiteContent(prev => ({ ...prev, ...c }));
       }
-    }).finally(() => setIsLoading(false));
+    } catch (err) {
+      console.error('Failed to fetch public data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Initial load
+    fetchPublicData();
+    // Refetch when the window regains focus or becomes visible (helps after sleep)
+    const onVisibility = () => { if (!document.hidden) fetchPublicData(); };
+    const onFocus = () => fetchPublicData();
+    const onOnline = () => fetchPublicData();
+    window.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
+    };
   }, []);
 
   // Fetch admin-only data when authenticated
