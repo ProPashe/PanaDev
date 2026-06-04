@@ -738,7 +738,7 @@ export default function AdminDashboard({
             </p>
           </div>
 
-          <div className={`rounded-[2rem] border ${theme.cardInner} p-5 shadow-sm bg-slate-950/50`}>
+          <div className={`rounded-4xl border ${theme.cardInner} p-5 shadow-sm bg-slate-950/50`}>
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">
                 <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-bold">Welcome back</p>
@@ -1492,7 +1492,7 @@ export default function AdminDashboard({
                     </div>
                   </div>
 
-                  <p className={`${theme.textMuted} text-[11px] leading-relaxed italic bg-[#000]/10 p-2 rounded-lg border border-slate-500/5`}>
+                  <p className={`${theme.textMuted} text-[11px] leading-relaxed italic bg-black/10 p-2 rounded-lg border border-slate-500/5`}>
                     "{booking.description}"
                   </p>
 
@@ -1591,7 +1591,7 @@ export default function AdminDashboard({
                   </div>
 
                   {sp.message && (
-                    <p className={`${theme.textMuted} text-[11px] italic bg-[#000]/10 p-2 rounded border border-slate-500/5`}>
+                    <p className={`${theme.textMuted} text-[11px] italic bg-black/10 p-2 rounded border border-slate-500/5`}>
                       "{sp.message}"
                     </p>
                   )}
@@ -1638,6 +1638,33 @@ export default function AdminDashboard({
                           )}
                         </>
                       )}
+                      {/* Delete when refused */}
+                      {canModifyBookings && getSponsorshipStatus(sp) === "Refused" && (
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm("Delete this refused sponsorship? This action cannot be undone.")) return;
+                            try {
+                              setSponsorshipActionLoading(prev => ({ ...prev, [sp.id]: true }));
+                              const res = await apiFetch(`/sponsorships/${sp.id}`, { method: "DELETE" });
+                              if (!res.ok) {
+                                const err = await res.json().catch(() => ({}));
+                                throw new Error(err.error || "Failed to delete sponsorship.");
+                              }
+                              await res.json();
+                              setSponsorships(current => current.filter(s => s.id !== sp.id));
+                              showToast("Sponsorship deleted.", "success");
+                            } catch (err: any) {
+                              showToast(err.message || "Failed to delete sponsorship.", "error");
+                            } finally {
+                              setSponsorshipActionLoading(prev => ({ ...prev, [sp.id]: false }));
+                            }
+                          }}
+                          className="px-3 py-2 rounded-lg bg-rose-700 text-white text-[10px] font-bold uppercase transition hover:bg-rose-600 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      )}
+
                       <span>ticket id: {sp.id}</span>
                     </div>
                   </div>

@@ -772,7 +772,7 @@ export default function ClientHub({
         <div className="space-y-6 lg:grid lg:grid-cols-3 lg:gap-6 lg:space-y-0 text-left">
           
           {/* Chat main display */}
-          <div className={`p-6 rounded-2xl border flex flex-col justify-between h-[450px] lg:col-span-2 ${theme.cardInner}`}>
+          <div className={`p-6 rounded-2xl border flex flex-col justify-between h-112.5 lg:col-span-2 ${theme.cardInner}`}>
             <div className="flex justify-between items-center pb-2.5 border-b border-zinc-900/10 select-none">
               <div className="flex items-center gap-1.5 font-mono">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block animate-ping" />
@@ -1040,7 +1040,7 @@ export default function ClientHub({
                       <span className="text-[10px] font-mono text-cyan-405 font-bold uppercase tracking-wide block">🏷️ Suggested High-Conversion SEO Keywords</span>
                       <div className="flex flex-wrap gap-1.5 pt-0.5">
                         {auditResult.suggestedKeywords.map((tag, idx) => (
-                          <span key={idx} className="text-[10px] font-mono px-2 py-0.5 bg-cyan-950/25 border border-cyan-900/20 text-cyan-404 rounded font-bold font-mono">{tag}</span>
+                          <span key={idx} className="text-[10px] px-2 py-0.5 bg-cyan-950/25 border border-cyan-900/20 text-cyan-404 rounded font-bold">{tag}</span>
                         ))}
                       </div>
                     </div>
@@ -1179,13 +1179,13 @@ export default function ClientHub({
               </form>
 
               {/* Active tickets listings */}
-              <div className="space-y-2 pt-1 font-mono text-[10px] max-h-[140px] overflow-y-auto">
+              <div className="space-y-2 pt-1 font-mono text-[10px] max-h-35 overflow-y-auto">
                 <span className="text-[10px] text-slate-550 block font-bold">ACTIVE TICKET RECORDS:</span>
                 {tickets.map((t, idx) => (
                   <div key={idx} className="p-2 bg-slate-900/40 border border-slate-850 rounded flex justify-between items-start gap-3">
                     <div className="space-y-1">
                       <p className="text-white font-bold leading-none">{t.subject}</p>
-                      <span className="text-[10px] text-slate-500 block truncate max-w-[160px]">{t.issue}</span>
+                      <span className="text-[10px] text-slate-500 block truncate max-w-40">{t.issue}</span>
                     </div>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-950/20 text-amber-500 border border-amber-900/20 uppercase shrink-0">
                       {t.category}
@@ -1294,7 +1294,7 @@ export default function ClientHub({
                 <span className="text-[10px] font-mono text-slate-505">SECURE DIGITAL AGREEMENT</span>
               </div>
 
-              <div className="p-3 bg-slate-900 border border-slate-850 rounded text-[10px] text-slate-400 space-y-2 h-[200px] overflow-y-auto">
+              <div className="p-3 bg-slate-900 border border-slate-850 rounded text-[10px] text-slate-400 space-y-2 h-50 overflow-y-auto">
                 <h5 className="font-extrabold text-white text-[10px] uppercase text-center pb-1 border-b border-slate-800">MUTUAL NON-DISCLOSURE AGREEMENT (NDA)</h5>
                 <p><strong>Parties:</strong> Panashe Mudzimwa (PanaDev director) and registered client registry partner: {user.name} ({user.email}).</p>
                 <p><strong>1. Purpose:</strong> This digital SLA seals production conditions on custom app codebases, templates, and systems audited under PanaDev.</p>

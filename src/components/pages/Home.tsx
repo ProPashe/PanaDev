@@ -88,15 +88,15 @@ export default function Home({ isDark, theme, setActiveTab, projects, feedbacks,
         className={`relative rounded-[2.5rem] overflow-hidden p-8 md:p-16 border ${
           isDark 
             ? "bg-[#050a14] border-slate-800/80 shadow-2xl" 
-            : "bg-gradient-to-br from-white via-slate-50 to-emerald-50/30 border-slate-200 shadow-xl"
+            : "bg-linear-to-br from-white via-slate-50 to-emerald-50/30 border-slate-200 shadow-xl"
         }`}
       >
         {/* Abstract animated grid lines and radial ambient glows */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none select-none bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-[size:24px_24px]" />
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none select-none bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-size-[24px_24px]" />
         
         {/* Animated Orbs */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/20 rounded-full blur-[100px] opacity-50 animate-float pointer-events-none mix-blend-screen" />
-        <div className="absolute bottom-0 left-20 w-[400px] h-[400px] bg-cyan-500/10 rounded-full blur-[80px] opacity-40 animate-float pointer-events-none mix-blend-screen" style={{animationDelay: '2s'}} />
+        <div className="absolute top-0 right-0 w-125 h-125 bg-emerald-500/20 rounded-full blur-[100px] opacity-50 animate-float pointer-events-none mix-blend-screen" />
+        <div className="absolute bottom-0 left-20 w-100 h-100 bg-cyan-500/10 rounded-full blur-[80px] opacity-40 animate-float pointer-events-none mix-blend-screen" style={{animationDelay: '2s'}} />
         <div className="absolute -left-20 -top-20 w-80 h-80 bg-[#0ea5e9]/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
         
         <div className="relative z-10 max-w-4xl space-y-8 animate-fade-in-up">
@@ -111,7 +111,7 @@ export default function Home({ isDark, theme, setActiveTab, projects, feedbacks,
 
           <h1 className={`text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter ${theme.textHeading} leading-[1.1]`}>
             Building Modern, Secure & <br className="hidden md:block"/>
-            <span className="gradient-text bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-cyan-400 to-emerald-400 bg-[length:200%_auto] animate-[shimmer_3s_linear_infinite]">
+            <span className="gradient-text bg-clip-text text-transparent bg-linear-to-r from-emerald-400 via-cyan-400 to-emerald-400 bg-size-[200%_auto] animate-[shimmer_3s_linear_infinite]">
               Scalable Systems.
             </span>
           </h1>
@@ -123,7 +123,7 @@ export default function Home({ isDark, theme, setActiveTab, projects, feedbacks,
           <div className="flex flex-wrap gap-4 pt-4">
             <button
               onClick={() => setActiveTab("projects")}
-              className="group flex items-center gap-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 py-3.5 px-8 rounded-2xl font-bold text-sm shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] hover:-translate-y-0.5 cursor-pointer"
+              className="group flex items-center gap-3 bg-linear-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 py-3.5 px-8 rounded-2xl font-bold text-sm shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] hover:-translate-y-0.5 cursor-pointer"
             >
               <Layers className="w-5 h-5" />
               <span>View Portfolio</span>
@@ -172,11 +172,11 @@ export default function Home({ isDark, theme, setActiveTab, projects, feedbacks,
       </div>
 
       {/* Statistics Bar */}
-      <div className={`grid grid-cols-2 md:grid-cols-4 gap-6 p-8 md:p-10 rounded-[2rem] border ${isDark ? 'bg-gradient-to-r from-slate-900 via-[#0a101c] to-slate-900 border-slate-800/60' : 'bg-white border-slate-200'} shadow-sm text-center relative overflow-hidden`}>
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-emerald-500/5 pointer-events-none" />
+      <div className={`grid grid-cols-2 md:grid-cols-4 gap-6 p-8 md:p-10 rounded-4xl border ${isDark ? 'bg-linear-to-r from-slate-900 via-[#0a101c] to-slate-900 border-slate-800/60' : 'bg-white border-slate-200'} shadow-sm text-center relative overflow-hidden`}>
+        <div className="absolute inset-0 bg-linear-to-b from-transparent to-emerald-500/5 pointer-events-none" />
         {stats.map((stat, idx) => (
           <div key={idx} className="space-y-2 relative z-10 animate-fade-in-up" style={{animationDelay: `${idx * 0.1}s`}}>
-            <p className="text-3xl md:text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-br from-emerald-400 to-cyan-500 font-mono tracking-tighter">
+            <p className="text-3xl md:text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-linear-to-br from-emerald-400 to-cyan-500 font-mono tracking-tighter">
               {stat.value}
             </p>
             <p className={`${theme.textMuted} text-[10px] md:text-xs font-mono uppercase tracking-widest font-bold`}>
@@ -204,7 +204,7 @@ export default function Home({ isDark, theme, setActiveTab, projects, feedbacks,
           {services.map((service, idx) => (
             <div 
               key={idx}
-              className={`p-8 rounded-[2rem] border ${theme.cardInner} transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group flex flex-col justify-between relative overflow-hidden`}
+              className={`p-8 rounded-4xl border ${theme.cardInner} transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group flex flex-col justify-between relative overflow-hidden`}
             >
               <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
                 {React.cloneElement(service.icon, { className: "w-24 h-24" })}
@@ -255,11 +255,11 @@ export default function Home({ isDark, theme, setActiveTab, projects, feedbacks,
           {featuredProjects.map((project) => (
             <div 
               key={project.id}
-              className={`rounded-[2rem] border ${theme.cardInner} flex flex-col overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 group`}
+              className={`rounded-4xl border ${theme.cardInner} flex flex-col overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 group`}
             >
               {/* Image Placeholder - User will replace this with real images */}
               <div className={`aspect-video w-full ${isDark ? 'bg-slate-900/80' : 'bg-slate-100'} flex items-center justify-center border-b ${isDark ? 'border-slate-800' : 'border-slate-200'} relative overflow-hidden`}>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent z-10" />
                 <span className="text-slate-500 font-mono text-xs z-20 flex items-center gap-2">
                   <Palette className="w-4 h-4" /> Add Screenshot Here
                 </span>
@@ -368,7 +368,7 @@ export default function Home({ isDark, theme, setActiveTab, projects, feedbacks,
             testimonials.map((test) => (
               <div 
                 key={test.id}
-                className={`p-8 rounded-[2rem] border ${theme.cardInner} flex flex-col justify-between h-full space-y-6 relative hover:-translate-y-1 transition-transform`}
+                className={`p-8 rounded-4xl border ${theme.cardInner} flex flex-col justify-between h-full space-y-6 relative hover:-translate-y-1 transition-transform`}
               >
                 <div className="absolute top-6 right-6 text-6xl font-serif text-slate-800/30 leading-none">"</div>
                 <div className="space-y-4 relative z-10">
@@ -385,7 +385,7 @@ export default function Home({ isDark, theme, setActiveTab, projects, feedbacks,
                   </p>
                 </div>
                 <div className="flex items-center gap-3 border-t border-slate-500/10 pt-4 relative z-10">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 text-slate-900 font-bold flex items-center justify-center text-sm font-mono shadow-md">
+                  <div className="w-10 h-10 rounded-full bg-linear-to-br from-emerald-500 to-cyan-500 text-slate-900 font-bold flex items-center justify-center text-sm font-mono shadow-md">
                     {test.clientName[0]}
                   </div>
                   <div>
@@ -404,7 +404,7 @@ export default function Home({ isDark, theme, setActiveTab, projects, feedbacks,
       </div>
 
       {/* CTA Banner */}
-      <div className={`relative overflow-hidden p-10 md:p-14 rounded-[2.5rem] bg-gradient-to-br ${isDark ? 'from-emerald-950 via-[#0a101c] to-[#0ea5e9]/20 border-emerald-900/30' : 'from-emerald-50 via-white to-cyan-50 border-emerald-100'} border flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left shadow-2xl`}>
+      <div className={`relative overflow-hidden p-10 md:p-14 rounded-[2.5rem] bg-linear-to-br ${isDark ? 'from-emerald-950 via-[#0a101c] to-[#0ea5e9]/20 border-emerald-900/30' : 'from-emerald-50 via-white to-cyan-50 border-emerald-100'} border flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left shadow-2xl`}>
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay pointer-events-none" />
         
         <div className="space-y-4 max-w-2xl relative z-10">

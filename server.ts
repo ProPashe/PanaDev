@@ -173,7 +173,7 @@ async function writeToLocalDb(colName: string, item: any, id?: string) {
   if (id) {
     const idx = data[colName].findIndex((x: any) => x.id === id);
     if (idx !== -1) {
-      data[colName][idx] = { ...data[colName][idx], ...item, id };
+      data[colName][idx] = { ...data[colName][idx], ...item, id, updatedAt: new Date().toISOString() };
     } else {
       data[colName].push({ ...item, id });
     }
@@ -191,15 +191,20 @@ async function deleteFromLocalDb(colName: string, id: string) {
   writeDbJson(data);
 }
 
-async function updateLocalDbStatus(colName: string, id: string, payload: Record<string, any>) {
+async function updateLocalDbItem(colName: string, id: string, payload: Record<string, any>) {
   colName = sanitizeCollectionName(colName);
   const data = readDbJson();
-  if (!Array.isArray(data[colName])) return;
+  if (!Array.isArray(data[colName])) return null;
   const idx = data[colName].findIndex((x: any) => x.id === id);
-  if (idx !== -1) {
-    data[colName][idx] = { ...data[colName][idx], ...payload, id };
-    writeDbJson(data);
-  }
+  if (idx === -1) return null;
+  const updated = { ...data[colName][idx], ...payload, id, updatedAt: new Date().toISOString() };
+  data[colName][idx] = updated;
+  writeDbJson(data);
+  return updated;
+}
+
+async function updateLocalDbStatus(colName: string, id: string, payload: Record<string, any>) {
+  return updateLocalDbItem(colName, id, payload);
 }
 
 // ─── Custom JWT Utilities ──────────────────────────────────────────────────────
@@ -638,7 +643,7 @@ app.post("/api/sponsorships", formLimiter, async (req, res) => {
     return res.status(400).json({ error: "Missing required sponsorship properties" });
   }
 
-  const newSponsor = {
+  const newSponsor: any = {
     name: nameToUse,
     organization: orgToUse || "",
     email: emailToUse,
@@ -646,11 +651,16 @@ app.post("/api/sponsorships", formLimiter, async (req, res) => {
     amount: amountToUse ? parseInt(amountToUse, 10) : 0,
     website: website || "",
     message: message || "",
-    durationMonths: req.body.durationMonths ? parseInt(req.body.durationMonths, 10) : undefined,
-    tier: req.body.tier || undefined,
     status: "Pending",
     createdAt: new Date().toISOString()
   };
+
+  if (req.body.durationMonths) {
+    newSponsor.durationMonths = parseInt(req.body.durationMonths, 10);
+  }
+  if (req.body.tier) {
+    newSponsor.tier = req.body.tier;
+  }
 
   if (dbFirestore) {
     const docRef = await dbFirestore.collection("sponsorships").add(newSponsor);
@@ -692,9 +702,11 @@ app.put("/api/sponsorships/:id", verifyAdmin, async (req, res) => {
 
   if (!dbFirestore) {
     try {
-      await updateLocalDbStatus("sponsorships", req.params.id, updatePayload);
-      const stored = (await fetchCollection("sponsorships")).find((item: any) => item.id === req.params.id);
-      return res.json({ success: true, sponsorship: stored });
+      const updatedSponsorship = await updateLocalDbItem("sponsorships", req.params.id, updatePayload);
+      if (!updatedSponsorship) {
+        return res.status(404).json({ error: "Sponsorship not found" });
+      }
+      return res.json({ success: true, sponsorship: updatedSponsorship });
     } catch (err) {
       return res.status(500).json({ error: "Failed to update sponsorship status locally" });
     }
@@ -707,6 +719,28 @@ app.put("/api/sponsorships/:id", verifyAdmin, async (req, res) => {
     return res.json({ success: true, sponsorship: { id: updatedDoc.id, ...(updatedDoc.data() || {}) } });
   } catch (err) {
     res.status(500).json({ error: "Failed to update sponsorship status" });
+  }
+});
+
+// Sponsorship delete (admin only)
+app.delete("/api/sponsorships/:id", verifyAdmin, async (req, res) => {
+  const id = req.params.id;
+  if (!id) return res.status(400).json({ error: "Missing sponsorship id" });
+
+  if (!dbFirestore) {
+    try {
+      await deleteFromLocalDb("sponsorships", id);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to delete sponsorship locally" });
+    }
+  }
+
+  try {
+    await dbFirestore.collection("sponsorships").doc(id).delete();
+    return res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete sponsorship" });
   }
 });
 
@@ -1025,16 +1059,20 @@ app.delete("/api/feedback/:id", verifyAdmin, async (req, res) => {
 
 // Admin Booking Status UPDATE
 app.put("/api/bookings/:id", verifyAdmin, async (req, res) => {
+  const updatePayload: any = { status: req.body.status };
   if (!dbFirestore) {
     try {
-      await updateLocalDbStatus("bookings", req.params.id, { status: req.body.status });
-      return res.json({ success: true });
+      const updatedBooking = await updateLocalDbItem("bookings", req.params.id, updatePayload);
+      if (!updatedBooking) {
+        return res.status(404).json({ error: "Booking not found" });
+      }
+      return res.json({ success: true, booking: updatedBooking });
     } catch (err) {
       return res.status(500).json({ error: "Failed to update booking status locally" });
     }
   }
   try {
-    await dbFirestore.collection("bookings").doc(req.params.id).update({ status: req.body.status });
+    await dbFirestore.collection("bookings").doc(req.params.id).update(updatePayload);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to update booking status" });

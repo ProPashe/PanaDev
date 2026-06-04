@@ -14,7 +14,7 @@ import FeedbackPage from "@/src/components/pages/Feedback";
 import ClientHub from "@/src/components/pages/ClientHub";
 import AdminDashboard from "@/src/components/pages/AdminDashboard";
 import AdminLogin from "@/src/components/pages/AdminLogin";
-import { UserRole } from "@/src/types";
+import { UserRole, Project as ProjectType, Feedback as FeedbackType, Booking as BookingType } from "@/src/types";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -23,20 +23,6 @@ const queryClient = new QueryClient({
 type Tab = "home" | "projects" | "services" | "about" | "booking" | "sponsorship" | "feedback" | "admin" | "clienthub" | "admin-login";
 
 interface User { name: string; email: string; avatarUrl?: string; role?: UserRole }
-interface Project {
-  id: string; title: string; description: string; fullDescription: string;
-  tags: string[]; deployedUrl: string; githubUrl: string; category: string;
-  status?: string; metrics: { stars: number; downloads?: string; users?: string };
-}
-interface Feedback {
-  id: string; projectId: string; clientName: string; clientEmail: string;
-  rating: number; comment: string; createdAt: string;
-}
-interface Booking {
-  id: string; clientName: string; clientEmail: string; companyName?: string;
-  date: string; timeSlot: string; projectType: string;
-  description: string; createdAt: string; status: string; budget?: string;
-}
 
 function AppInner() {
   const [isDark, setIsDark] = useState(true);
@@ -59,9 +45,9 @@ function AppInner() {
   const [successModalData, setSuccessModalData] = useState<{
     type: string; title: string; message: string; whatsAppUrl: string; whatsAppText: string;
   } | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [projects, setProjects] = useState<ProjectType[]>([]);
+  const [feedbacks, setFeedbacks] = useState<FeedbackType[]>([]);
+  const [bookings, setBookings] = useState<BookingType[]>([]);
   const [sponsorships, setSponsorships] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
@@ -183,7 +169,7 @@ function AppInner() {
       setSponsorForm(s => ({ ...s, sponsorName: user.name, sponsorEmail: user.email, phone: s.phone }));
     } else {
       setFeedbackForm({ clientName: "", clientEmail: "", rating: 5, comment: "", projectId: "" });
-      setBookingForm({ clientName: "", clientEmail: "", companyName: "", date: new Date().toISOString().split("T")[0], timeSlot: "02:00 PM - 03:00 PM", projectType: "web", description: "", budget: "" });
+      setBookingForm({ clientName: "", clientEmail: "", companyName: "", date: new Date().toISOString().split("T")[0], timeSlot: "02:00 PM - 03:00 PM", projectType: "web", description: "", budget: "", termsAccepted: false });
       setContactForm({ name: "", email: "", subject: "", message: "" });
       setSponsorForm({ sponsorName: "", sponsorEmail: "", phone: "", companyName: "", fundingAmount: 0, website: "", message: "" });
     }
